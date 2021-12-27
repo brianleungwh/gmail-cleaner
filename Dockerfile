@@ -4,4 +4,6 @@ RUN curl -sSL https://install.python-poetry.org | python3 -
 
 WORKDIR /gmail-cleaner
 
-CMD ["python3"]
+RUN /root/.local/bin/poetry install
+
+CMD ["poetry", "shell"]

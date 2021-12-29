@@ -55,8 +55,10 @@ def main():
             thread = gmail_service.users().threads().get(userId='me', id=t['id']).execute()
             print(len(thread['messages']))
             msg = thread['messages'][0]
-            print(msg.keys())
 
+            msg = gmail_service.users().messages().get(userId='me', id=msg['id'], format='raw').execute()
+            print(msg.keys())
+            print(msg['raw'])
 
     except HttpError as error:
         # TODO(developer) - Handle errors from gmail API.

@@ -21,10 +21,10 @@ def add_to_marketers(headers):
     """
     headers: Headers object
     """
-    if headers.get_from in marketers:
-        marketers[headers.get_from].append(headers.get_unsub_link)
+    if headers['from'] in marketers:
+        marketers[headers['from']].append(headers['list_unsubscribe'])
     else:
-        marketers[headers.get_from] = [headers.get_unsub_link]
+        marketers[headers['from']] = [headers['list_unsubscribe']]
 
 
 def main():
@@ -72,7 +72,7 @@ def main():
             msg = thread['messages'][0]
 
             headers = Headers(msg['payload']['headers'])
-            if headers.is_list_unsub_available:
+            if 'list_unsubscribe' in headers:
                 add_to_marketers(headers)
                     
         print("Found {num} marketers".format(num=len(marketers)))

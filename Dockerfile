@@ -14,4 +14,4 @@ EXPOSE 8080
 
 CMD /root/.local/bin/poetry run python gmail_cleaner/main.py
 
-# CMD /root/.local/bin/poetry run python -m http.server 8080 
+# CMD ["/bin/bash"]

@@ -15,16 +15,18 @@ from gmail_cleaner.headers import Headers
 SCOPES = ['https://mail.google.com/']
 
 
-marketers = {}
+marketers = []
 
 def add_to_marketers(headers):
     """
     headers: Headers object
     """
-    if headers['from'] in marketers:
-        marketers[headers['from']].append(headers['list_unsubscribe'])
-    else:
-        marketers[headers['from']] = [headers['list_unsubscribe']]
+    entry = {
+        'sender_name': headers.get_sender_name(),
+        'sender_email': headers.get_sender_email(),
+        'unsub_links': headers.get_list_of_unsub_links()
+    }
+    marketers.append(entry)
 
 
 def main():
@@ -76,10 +78,13 @@ def main():
                 add_to_marketers(headers)
                     
         print("Found {num} marketers".format(num=len(marketers)))
-        for sender, unsub_links in marketers.items():
-            print(sender)
-            for unsub_link in unsub_links:
-                print('  {link}'.format(link=unsub_link))
+
+        for marketer in marketers:
+            print(marketer['sender_name'])
+            print(marketer['sender_email'])
+            for ul in marketer['unsub_links']:
+                print('  ' + ul.type() + ' ' + ul.action_link())
+            print('\n')
 
             
         # result = gmail_service.users().getProfile(userId='me').execute()

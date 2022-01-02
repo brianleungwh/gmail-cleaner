@@ -84,8 +84,9 @@ def main():
         for marketer in marketers:
             print(marketer['sender_name'])
             print(marketer['sender_email'])
+            print(len(marketer['unsub_links']))
             for ul in marketer['unsub_links']:
-                print('  ' + ul.method() + ' ' + ul.action_link())
+                print('{} - {}'.format(ul.method(), ul.action_link()))
                 all_links.append(ul.action_link())
                 unique_links.add(ul.action_link())
             print('\n')

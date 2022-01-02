@@ -38,9 +38,7 @@ class UnsubscribeLink(object):
         Returns link to operate the unsubscribe operation
         """
         if self.is_mailto():
-            pattern = r'^.+:(.+)$'
-            print(self.link)
-            return re.search(pattern, self.link).group(1)
+            return self.link[self.link.find(':')+1:-1]
         else:
             return self.link
 

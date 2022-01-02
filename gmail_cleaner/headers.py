@@ -20,26 +20,27 @@ class UnsubscribeLink(object):
         else:
             self.link = re.search(pattern, link).group(1)
 
-    def type(self):
+    def method(self):
         """
-        Returns whether the link is mailto type or http type
+        Returns whether the link is mailto method or http method
         """
         protocal = self.link[0:self.link.find(':')]
         return protocal        
 
     def is_mailto(self):
-        return True if self.type == 'mailto' else False
+        return self.method() == 'mailto'
 
     def is_http(self):
-        return True if self.type == 'http' else False
+        return self.method() == 'http'
 
     def action_link(self):
         """
         Returns link to operate the unsubscribe operation
         """
         if self.is_mailto():
-            pattern = '/:([\s\S]*)$/'
-            return re.match(pattern, self.link)
+            pattern = r'^.+:(.+)$'
+            print(self.link)
+            return re.search(pattern, self.link).group(1)
         else:
             return self.link
 

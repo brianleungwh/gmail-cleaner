@@ -79,12 +79,18 @@ def main():
                     
         print("Found {num} marketers".format(num=len(marketers)))
 
+        all_links = []
+        unique_links = set()
         for marketer in marketers:
             print(marketer['sender_name'])
             print(marketer['sender_email'])
             for ul in marketer['unsub_links']:
-                print('  ' + ul.type() + ' ' + ul.action_link())
+                print('  ' + ul.method() + ' ' + ul.action_link())
+                all_links.append(ul.action_link())
+                unique_links.add(ul.action_link())
             print('\n')
+
+        print('Elimindated {} duplicate links'.format(str(len(all_links) - len(unique_links))))
 
             
         # result = gmail_service.users().getProfile(userId='me').execute()

@@ -79,7 +79,7 @@ def main():
             msg = thread['messages'][0]
 
             headers = Headers(msg['payload']['headers'])
-            if headers.unsubscribable:
+            if headers.unsubscribable():
                 add_to_senders(senders, t['id'], headers)
 
         print("Found {num} unique senders".format(num=len(senders)))

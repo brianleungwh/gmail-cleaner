@@ -78,7 +78,7 @@ class Headers(object):
         else:
             return self.data[item]
 
-    def unsubscribable():
+    def unsubscribable(self):
         """
         Returns True if 'list_unsubscribe' is in header
         """

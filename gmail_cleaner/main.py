@@ -87,7 +87,7 @@ def main():
         for sender_email, sender_obj in senders.items():
 
             # unsubscribe from sender
-            sender_obj.do_unsubscribe()
+            sender_obj.do_unsubscribe(gmail_service)
 
             # move all threads associated with sender to trash
             for t_id in sender_obj.thread_ids:

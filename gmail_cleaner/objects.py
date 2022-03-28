@@ -13,6 +13,19 @@ class Sender(object):
         self.unsub_links = headers.get_list_of_unsub_links()
         self.thread_ids = [thread_id]
 
+    def do_unsubscribe(self, gmail_service):
+        """
+        Makes request to unsub from sender.
+        Prefers mailto method. If mailto method not available, try http method with both GET and POST
+        """
+        for unsub_link in self.unsub_links:
+            if unsub_link.is_mailto():
+                unsub_link.action_link()
+            else:
+                # make both http GET and POST to action link
+                unsub_link.action_link()
+
+
 class UnsubscribeLink(object):
     """
     Represents an unsubscribe link

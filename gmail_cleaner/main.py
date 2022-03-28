@@ -9,24 +9,12 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from gmail_cleaner.headers import Headers
+from gmail_cleaner.objects import Headers
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://mail.google.com/']
 
 
-marketers = []
-
-def add_to_marketers(headers):
-    """
-    headers: Headers object
-    """
-    entry = {
-        'sender_name': headers.get_sender_name(),
-        'sender_email': headers.get_sender_email(),
-        'unsub_links': headers.get_list_of_unsub_links(),
-    }
-    marketers.append(entry)
 
 
 def main():
@@ -51,6 +39,7 @@ def main():
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
 
+    # Main logic begins
     try:
         # Call the Gmail API
         gmail_service = build('gmail', 'v1', credentials=creds)
@@ -68,6 +57,19 @@ def main():
         if not threads:
             print('No threads found.')
             return
+
+        marketers = []
+
+        def add_to_marketers(headers):
+            """
+            headers: Headers object
+            """
+            entry = {
+                'sender_name': headers.get_sender_name(),
+                'sender_email': headers.get_sender_email(),
+                'unsub_links': headers.get_list_of_unsub_links(),
+            }
+            marketers.append(entry)
 
         for t in threads:
             thread = gmail_service.users().threads().get(userId='me', id=t['id']).execute()

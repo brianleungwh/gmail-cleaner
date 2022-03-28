@@ -9,6 +9,7 @@ python = "^3.10"
 google-api-python-client = "^2.33.0"
 google-auth-httplib2 = "^0.1.0"
 google-auth-oauthlib = "^0.4.6"
+case-converter = "^1.0.2"
 
 
 [tool.poetry.dev-dependencies]

@@ -24,7 +24,7 @@ def add_to_marketers(headers):
     entry = {
         'sender_name': headers.get_sender_name(),
         'sender_email': headers.get_sender_email(),
-        'unsub_links': headers.get_list_of_unsub_links()
+        'unsub_links': headers.get_list_of_unsub_links(),
     }
     marketers.append(entry)
 
@@ -77,21 +77,26 @@ def main():
             if 'list_unsubscribe' in headers:
                 add_to_marketers(headers)
                     
-        print("Found {num} marketers".format(num=len(marketers)))
+        print("Found {num} marketing emails".format(num=len(marketers)))
 
-        all_links = []
-        unique_links = set()
+        # eliminate duplicate entries in list
+        unique_senders = set()
+        new_list = []
         for marketer in marketers:
-            print(marketer['sender_name'])
-            print(marketer['sender_email'])
-            print(len(marketer['unsub_links']))
-            for ul in marketer['unsub_links']:
-                print('{} - {}'.format(ul.method(), ul.action_link()))
-                all_links.append(ul.action_link())
-                unique_links.add(ul.action_link())
-            print('\n')
+           if marketer['sender_email'] in unique_senders:
+               print('Duplicate sender {}'.format(marketer['sender_email']))
+               continue
+           else:
+               new_list.append(marketer)
+               unique_senders.add(marketer['sender_email'])
 
-        print('Elimindated {} duplicate links'.format(str(len(all_links) - len(unique_links))))
+        print(len(marketers))
+        print(len(new_list))
+
+        for m in new_list:
+            print('{} {}'.format(m['sender_name'], m['sender_email']))
+            for link in m['unsub_links']:
+                print('{} {}'.format(link.method(), link.action_link()))
 
             
         # result = gmail_service.users().getProfile(userId='me').execute()

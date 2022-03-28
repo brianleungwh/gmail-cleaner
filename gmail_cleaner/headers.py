@@ -91,3 +91,13 @@ class Headers(object):
         links = unparsed_list.split(', ')
         return [UnsubscribeLink(link) for link in links]
 
+    def action_link(self):
+        """
+        returns the action link to unsubscribe
+        """
+        all_links = self.get_list_of_unsub_links()
+        for link in all_links:
+            if link.is_mailto():
+                return link.action_link()
+            else:
+                return link.action_link()

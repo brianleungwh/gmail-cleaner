@@ -7,7 +7,7 @@ class Sender(object):
     Represents a sender
     """
 
-    def __init_(self, thread_id=None, headers=None):
+    def __init__(self, thread_id=None, headers=None):
         self.name = headers.get_sender_name(),
         self.email = headers.get_sender_email(),
         self.unsub_links = headers.get_list_of_unsub_links()

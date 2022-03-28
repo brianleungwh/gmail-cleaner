@@ -80,29 +80,29 @@ def main():
 
             headers = Headers(msg['payload']['headers'])
             if headers.unsubscribable:
-                add_to_senders(senders, thread_id, headers)
+                add_to_senders(senders, t['id'], headers)
 
-        print("Found {num} marketing emails".format(num=len(marketers)))
+        print("Found {num} unique senders".format(num=len(senders)))
 
         # eliminate duplicate entries in list
-        unique_senders = set()
-        to_unsub = []
-        for marketer in marketers:
-           if marketer['sender_email'] in unique_senders:
-               print('Duplicate sender {}'.format(marketer['sender_email']))
-               continue
-           else:
-               to_unsub.append(marketer)
-               unique_senders.add(marketer['sender_email'])
+        # unique_senders = set()
+        # to_unsub = []
+        # for marketer in marketers:
+        #    if marketer['sender_email'] in unique_senders:
+        #        print('Duplicate sender {}'.format(marketer['sender_email']))
+        #        continue
+        #    else:
+        #        to_unsub.append(marketer)
+        #        unique_senders.add(marketer['sender_email'])
 
-        for m in to_unsub:
-            print('{} {}'.format(m['sender_name'], m['sender_email']))
-            for link in m['unsub_links']:
-                print('{} {}'.format(link.method(), link.action_link()))
+        # for m in to_unsub:
+        #     print('{} {}'.format(m['sender_name'], m['sender_email']))
+        #     for link in m['unsub_links']:
+        #         print('{} {}'.format(link.method(), link.action_link()))
 
-        respond = input("y or n")
-        print(respond)
-        print(type(respond))
+        # respond = input("y or n")
+        # print(respond)
+        # print(type(respond))
 
             
         # result = gmail_service.users().getProfile(userId='me').execute()

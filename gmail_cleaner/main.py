@@ -9,12 +9,25 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from gmail_cleaner.objects import Headers
+from gmail_cleaner.objects import Headers, Sender
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://mail.google.com/']
 
 
+def add_to_senders(senders, thread_id, headers):
+    """
+    Add to the dictionary of senders, avoiding duplicates while appending new thread id
+    """
+    sender_email = headers.get_sender_email()
+    if sender_email in senders:
+        # append thread id to sender instance
+        sender = senders[sender_email]
+        sender.thread_ids.append(thread_id)
+    else:
+        # instantiate a new sender obj and add to dict of senders
+        sender = Sender(thread_id=thread_id, headers=headers)
+        senders[sender_email] = sender
 
 
 def main():
@@ -58,27 +71,17 @@ def main():
             print('No threads found.')
             return
 
-        marketers = []
-
-        def add_to_marketers(headers):
-            """
-            headers: Headers object
-            """
-            entry = {
-                'sender_name': headers.get_sender_name(),
-                'sender_email': headers.get_sender_email(),
-                'unsub_links': headers.get_list_of_unsub_links(),
-            }
-            marketers.append(entry)
+        senders = {}
+        # where sender email is used as a uid as a key and sender obj as the value in the dict
 
         for t in threads:
             thread = gmail_service.users().threads().get(userId='me', id=t['id']).execute()
             msg = thread['messages'][0]
 
             headers = Headers(msg['payload']['headers'])
-            if 'list_unsubscribe' in headers:
-                add_to_marketers(headers)
-                    
+            if headers.unsubscribable:
+                add_to_senders(senders, thread_id, headers)
+
         print("Found {num} marketing emails".format(num=len(marketers)))
 
         # eliminate duplicate entries in list

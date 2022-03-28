@@ -7,7 +7,7 @@ class Sender(object):
     Represents a sender
     """
 
-    def __init_(self, thread_id, headers):
+    def __init_(self, thread_id=None, headers=None):
         self.name = headers.get_sender_name(),
         self.email = headers.get_sender_email(),
         self.unsub_links = headers.get_list_of_unsub_links()
@@ -77,6 +77,14 @@ class Headers(object):
             raise KeyError('{} not in headers'.format(item))
         else:
             return self.data[item]
+
+    def unsubscribable():
+        """
+        Returns True if 'list_unsubscribe' is in header
+        """
+        if 'list_unsubscribe' in self:
+            return True
+        return False
 
     def get_sender_name(self):
         """

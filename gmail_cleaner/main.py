@@ -81,22 +81,23 @@ def main():
 
         # eliminate duplicate entries in list
         unique_senders = set()
-        new_list = []
+        to_unsub = []
         for marketer in marketers:
            if marketer['sender_email'] in unique_senders:
                print('Duplicate sender {}'.format(marketer['sender_email']))
                continue
            else:
-               new_list.append(marketer)
+               to_unsub.append(marketer)
                unique_senders.add(marketer['sender_email'])
 
-        print(len(marketers))
-        print(len(new_list))
-
-        for m in new_list:
+        for m in to_unsub:
             print('{} {}'.format(m['sender_name'], m['sender_email']))
             for link in m['unsub_links']:
                 print('{} {}'.format(link.method(), link.action_link()))
+
+        respond = input("y or n")
+        print(respond)
+        print(type(respond))
 
             
         # result = gmail_service.users().getProfile(userId='me').execute()

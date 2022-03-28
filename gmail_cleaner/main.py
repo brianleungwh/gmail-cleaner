@@ -56,6 +56,8 @@ def main():
     try:
         # Call the Gmail API
         gmail_service = build('gmail', 'v1', credentials=creds)
+        user_email = gmail_service.users().getProfile(userId='me').execute().get('emailAddress')
+        print(user_email)
 
         # pageToken = ''
         results = gmail_service.users().threads().list(
@@ -87,7 +89,7 @@ def main():
         for sender_email, sender_obj in senders.items():
 
             # unsubscribe from sender
-            sender_obj.do_unsubscribe(gmail_service)
+            sender_obj.do_unsubscribe(user_email, gmail_service)
 
             # move all threads associated with sender to trash
             for t_id in sender_obj.thread_ids:

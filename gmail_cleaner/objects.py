@@ -2,6 +2,16 @@ import re
 
 from caseconverter import snakecase
 
+class Sender(object):
+    """
+    Represents a sender
+    """
+
+    def __init_(self, thread_id, headers):
+        self.name = headers.get_sender_name(),
+        self.email = headers.get_sender_email(),
+        self.unsub_links = headers.get_list_of_unsub_links()
+        self.thread_ids = [thread_id]
 
 class UnsubscribeLink(object):
     """

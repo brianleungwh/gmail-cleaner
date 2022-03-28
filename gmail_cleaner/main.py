@@ -84,21 +84,16 @@ def main():
 
         print("Found {num} unique senders".format(num=len(senders)))
 
-        # eliminate duplicate entries in list
-        # unique_senders = set()
-        # to_unsub = []
-        # for marketer in marketers:
-        #    if marketer['sender_email'] in unique_senders:
-        #        print('Duplicate sender {}'.format(marketer['sender_email']))
-        #        continue
-        #    else:
-        #        to_unsub.append(marketer)
-        #        unique_senders.add(marketer['sender_email'])
+        for sender_email, sender_obj in senders.items():
 
-        # for m in to_unsub:
-        #     print('{} {}'.format(m['sender_name'], m['sender_email']))
-        #     for link in m['unsub_links']:
-        #         print('{} {}'.format(link.method(), link.action_link()))
+            # unsubscribe from sender
+            sender_obj.do_unsubscribe()
+
+            # move all threads associated with sender to trash
+            for t_id in sender_obj.thread_ids:
+                gmail_service.users().threads().trash(userId='me', id=t_id)
+
+
 
         # respond = input("y or n")
         # print(respond)

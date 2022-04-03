@@ -105,31 +105,33 @@ def main():
 
         print("Found {num} unique senders".format(num=len(senders)))
 
+        prompt_user('just wait')
+
 
         # builds truth table from user input
-        user_response = {}
-        for sender_email, sender_obj in senders.items():
-            question = "Unsubscribe and trash all emails from sender: {} {}".format(sender_obj.name, sender_email)
-            to_remove = prompt_user(question)
-            if to_remove:
-                user_response[sender_email] = True
-            else:
-                user_response[sender_email] = False
+        # user_response = {}
+        # for sender_email, sender_obj in senders.items():
+        #     question = "Unsubscribe and trash all emails from sender: {} {}".format(sender_obj.name, sender_email)
+        #     to_remove = prompt_user(question)
+        #     if to_remove:
+        #         user_response[sender_email] = True
+        #     else:
+        #         user_response[sender_email] = False
 
 
         # execute trashing threads and unsubscibe from senders
         # based on truth table
-        for sender_email, sender_obj in senders.items():
-            if user_response[sender_email]:
-                # unsubscribe from sender
-                sender_obj.do_unsubscribe(user_email, gmail_service)
+        # for sender_email, sender_obj in senders.items():
+        #     if user_response[sender_email]:
+        #         # unsubscribe from sender
+        #         sender_obj.do_unsubscribe(user_email, gmail_service)
 
-                # move all threads associated with sender to trash
-                for t_id in sender_obj.thread_ids:
-                    gmail_service.users().threads().trash(userId='me', id=t_id)
+        #         # move all threads associated with sender to trash
+        #         for t_id in sender_obj.thread_ids:
+        #             gmail_service.users().threads().trash(userId='me', id=t_id)
 
-            else:
-                print("skipping {} as user instructed".format(sender_email))
+        #     else:
+        #         print("skipping {} as user instructed".format(sender_email))
 
 
         # result = gmail_service.users().getProfile(userId='me').execute()

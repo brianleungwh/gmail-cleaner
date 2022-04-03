@@ -30,6 +30,24 @@ def add_to_senders(senders, thread_id, headers):
         senders[sender_email] = sender
 
 
+def prompt_user(question):
+    """
+    Helper to get yes / no answer from user.
+    """
+    yes = {'yes', 'y'}
+    no = {'no', 'n'}
+
+    print(question)
+    while True:
+        choice = input().lower()
+        if choice in yes:
+            return True
+        elif choice in no:
+            return False
+        else:
+            print("Please respond by yes or no.")
+
+
 def main():
     """Shows basic usage of the Gmail API.
     Lists the user's Gmail labels.
@@ -76,6 +94,7 @@ def main():
         senders = {}
         # where sender email is used as a uid as a key and sender obj as the value in the dict
 
+        # builds master dictionary of senders
         for t in threads:
             thread = gmail_service.users().threads().get(userId='me', id=t['id']).execute()
             msg = thread['messages'][0]
@@ -86,22 +105,33 @@ def main():
 
         print("Found {num} unique senders".format(num=len(senders)))
 
+
+        # builds truth table from user input
+        user_response = {}
         for sender_email, sender_obj in senders.items():
-
-            # unsubscribe from sender
-            sender_obj.do_unsubscribe(user_email, gmail_service)
-
-            # move all threads associated with sender to trash
-            for t_id in sender_obj.thread_ids:
-                gmail_service.users().threads().trash(userId='me', id=t_id)
-
+            question = "Unsubscribe and trash all emails from sender: {} {}".format(sender_obj.name, sender_email)
+            to_remove = prompt_user(question)
+            if to_remove:
+                user_response[sender_email] = True
+            else:
+                user_response[sender_email] = False
 
 
-        # respond = input("y or n")
-        # print(respond)
-        # print(type(respond))
+        # execute trashing threads and unsubscibe from senders
+        # based on truth table
+        for sender_email, sender_obj in senders.items():
+            if user_response[sender_email]:
+                # unsubscribe from sender
+                sender_obj.do_unsubscribe(user_email, gmail_service)
 
-            
+                # move all threads associated with sender to trash
+                for t_id in sender_obj.thread_ids:
+                    gmail_service.users().threads().trash(userId='me', id=t_id)
+
+            else:
+                print("skipping {} as user instructed".format(sender_email))
+
+
         # result = gmail_service.users().getProfile(userId='me').execute()
         # print(result)
 
@@ -112,8 +142,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    
-
-# snippet to decoce base64url to plain string in utf-8
-# message = gmail_service.users().messages().get(userId='me', id=msg['id'], format='raw').execute()
-# raw_message_str = str(base64.urlsafe_b64decode(message['raw']), 'utf-8')

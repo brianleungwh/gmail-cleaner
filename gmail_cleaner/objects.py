@@ -1,5 +1,7 @@
 import re
 
+import requests
+
 from caseconverter import snakecase
 from gmail_cleaner.utils import create_message, send_message
 
@@ -50,8 +52,9 @@ class Sender(object):
         else:
             # make both http GET and POST to list of unsub links
             for link in self.unsub_links:
-                send_get_request(link)
-                send_post_request(link)
+                requests.get(link)
+                requests.post(link)
+
 
 class UnsubscribeLink(object):
     """

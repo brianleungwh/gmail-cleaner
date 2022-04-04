@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import os.path
 import base64
+import logging
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -10,6 +11,9 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from gmail_cleaner.objects import Headers, Sender
+
+
+logging.basicConfig(level=logging.INFO)
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://mail.google.com/']
@@ -75,21 +79,40 @@ def main():
         # Call the Gmail API
         gmail_service = build('gmail', 'v1', credentials=creds)
         user_email = gmail_service.users().getProfile(userId='me').execute().get('emailAddress')
-        print(user_email)
 
-        # pageToken = ''
+        # max_results = 500
         results = gmail_service.users().threads().list(
-            userId='me', 
-            maxResults=100,
+            userId='me',
+            # maxResults=max_results,
+            includeSpamTrash=False,
         ).execute()
 
-        # pageToken = results['nextPageToken']
+        next_page_token = results.get('nextPageToken')
+        threads = []
+        while next_page_token:
+            print('looping')
+            print(next_page_token)
+            print(len(threads))
 
-        threads = results.get('threads', [])
+            threads.extend(results.get('threads', []))
+
+            results = gmail_service.users().threads().list(
+                userId='me',
+                pageToken=next_page_token,
+                # maxResults=max_results,
+                includeSpamTrash=False,
+            ).execute()
+            next_page_token = results.get('nextPageToken')
+
+
+        threads.extend(results.get('threads', []))
 
         if not threads:
             print('No threads found.')
             return
+
+        print("Processing {} total number of threads".format(len(threads)))
+
 
         senders = {}
         # where sender email is used as a uid as a key and sender obj as the value in the dict
@@ -105,8 +128,6 @@ def main():
 
         print("Found {num} unique senders".format(num=len(senders)))
 
-        prompt_user('just wait')
-
 
         # builds truth table from user input
         # user_response = {}
@@ -120,7 +141,7 @@ def main():
 
 
         # execute trashing threads and unsubscibe from senders
-        # based on truth table
+        # # based on truth table
         # for sender_email, sender_obj in senders.items():
         #     if user_response[sender_email]:
         #         # unsubscribe from sender

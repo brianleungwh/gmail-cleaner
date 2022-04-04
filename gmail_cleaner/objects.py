@@ -1,4 +1,5 @@
 import re
+import logging
 
 import requests
 
@@ -141,8 +142,15 @@ class Headers(object):
         """
         Returns sender's email as string
         """
-        pattern = '<(.*?)>'
-        return re.search(pattern, self.data['from']).group(1)
+        try:
+            pattern = '<(.*?)>'
+            return re.search(pattern, self.data['from']).group(1)
+        except AttributeError as e:
+            msg ='cannot parse sender email with conventional pattern - guessing it is {}'.format(self.data['from'])
+            logging.warning(msg)
+            # Some FROM header only has the following format
+            # {'from': 'autotrader-messages@blinker.com'}
+            return self.data['from']
 
     def get_list_of_unsub_links(self):
         """

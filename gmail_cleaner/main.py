@@ -26,10 +26,12 @@ def add_to_senders(senders, thread_id, headers):
     sender_email = headers.get_sender_email()
     if sender_email in senders:
         # append thread id to sender instance
+        logging.info('sender {} had already added. Adding new thread to the object'.format(sender_email))
         sender = senders[sender_email]
         sender.thread_ids.append(thread_id)
     else:
         # instantiate a new sender obj and add to dict of senders
+        logging.info('adding entry for new sender: {}'.format(sender_email))
         sender = Sender(thread_id=thread_id, headers=headers)
         senders[sender_email] = sender
 
@@ -90,10 +92,6 @@ def main():
         next_page_token = results.get('nextPageToken')
         threads = []
         while next_page_token:
-            print('looping')
-            print(next_page_token)
-            print(len(threads))
-
             threads.extend(results.get('threads', []))
 
             results = gmail_service.users().threads().list(
@@ -108,10 +106,10 @@ def main():
         threads.extend(results.get('threads', []))
 
         if not threads:
-            print('No threads found.')
+            logging.info('No threads found.')
             return
 
-        print("Processing {} total number of threads".format(len(threads)))
+        logging.info("Processing {} total number of threads".format(len(threads)))
 
 
         senders = {}
@@ -126,7 +124,7 @@ def main():
             if headers.unsubscribable():
                 add_to_senders(senders, t['id'], headers)
 
-        print("Found {num} unique senders".format(num=len(senders)))
+        logging.info("Found {num} unique senders".format(num=len(senders)))
 
 
         # builds truth table from user input
@@ -152,15 +150,12 @@ def main():
         #             gmail_service.users().threads().trash(userId='me', id=t_id)
 
         #     else:
-        #         print("skipping {} as user instructed".format(sender_email))
+        #         logging.info("skipping {} as user instructed".format(sender_email))
 
-
-        # result = gmail_service.users().getProfile(userId='me').execute()
-        # print(result)
 
     except HttpError as error:
         # TODO(developer) - Handle errors from gmail API.
-        print(f'An error occurred: {error}')
+        logging.info(f'An error occurred: {error}')
 
 
 if __name__ == '__main__':

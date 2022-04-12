@@ -116,7 +116,7 @@ def fetch_all_threads():
         logging.info("Processing {} total number of threads".format(len(threads)))
 
 
-        with shelve.open('senders') as senders:
+        with shelve.open('senders.db') as senders:
             # senders is a a dict where sender email is used as a uid as a key and sender obj as the value
 
             # builds master dictionary of senders
@@ -129,7 +129,6 @@ def fetch_all_threads():
                     add_to_senders(senders, t['id'], headers)
 
             logging.info("Found {num} unique senders".format(num=len(senders)))
-            shelve.close()
 
 
         # builds truth table from user input

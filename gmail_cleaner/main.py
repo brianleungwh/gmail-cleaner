@@ -16,7 +16,7 @@ from gmail_cleaner.objects import Headers, Sender
 
 logging.basicConfig(level=logging.INFO)
 
-socket.setdefaulttimeout(3*60)
+socket.setdefaulttimeout(10*60)
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://mail.google.com/']

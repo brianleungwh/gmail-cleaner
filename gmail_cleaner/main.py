@@ -2,6 +2,7 @@ import argparse
 import os.path
 import base64
 import logging
+import shelve
 import socket
 
 from google.auth.transport.requests import Request
@@ -115,19 +116,20 @@ def fetch_all_threads():
         logging.info("Processing {} total number of threads".format(len(threads)))
 
 
-        senders = {}
-        # where sender email is used as a uid as a key and sender obj as the value in the dict
+        with shelve.open('senders') as senders:
+            # senders is a a dict where sender email is used as a uid as a key and sender obj as the value
 
-        # builds master dictionary of senders
-        for t in threads:
-            thread = gmail_service.users().threads().get(userId='me', id=t['id']).execute()
-            msg = thread['messages'][0]
+            # builds master dictionary of senders
+            for t in threads:
+                thread = gmail_service.users().threads().get(userId='me', id=t['id']).execute()
+                msg = thread['messages'][0]
 
-            headers = Headers(msg['payload']['headers'])
-            if headers.unsubscribable():
-                add_to_senders(senders, t['id'], headers)
+                headers = Headers(msg['payload']['headers'])
+                if headers.unsubscribable():
+                    add_to_senders(senders, t['id'], headers)
 
-        logging.info("Found {num} unique senders".format(num=len(senders)))
+            logging.info("Found {num} unique senders".format(num=len(senders)))
+            shelve.close()
 
 
         # builds truth table from user input

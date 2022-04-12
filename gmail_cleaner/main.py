@@ -1,8 +1,7 @@
-from __future__ import print_function
-
 import os.path
 import base64
 import logging
+import socket
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -15,6 +14,8 @@ from gmail_cleaner.objects import Headers, Sender
 
 logging.basicConfig(level=logging.INFO)
 
+socket.setdefaulttimeout(3*60)
+
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://mail.google.com/']
 
@@ -26,7 +27,7 @@ def add_to_senders(senders, thread_id, headers):
     sender_email = headers.get_sender_email()
     if sender_email in senders:
         # append thread id to sender instance
-        logging.info('sender {} had already added. Adding new thread to the object'.format(sender_email))
+        logging.info('sender {} had already added. Adding new thread {} to the object'.format(sender_email, thread_id))
         sender = senders[sender_email]
         sender.thread_ids.append(thread_id)
     else:
@@ -60,6 +61,7 @@ def main():
     """
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
+
     # created automatically when the authorization flow completes for the first
     # time.
     if os.path.exists('token.json'):

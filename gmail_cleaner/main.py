@@ -1,3 +1,4 @@
+import argparse
 import os.path
 import base64
 import logging
@@ -55,7 +56,7 @@ def prompt_user(question):
             print("Please respond by yes or no.")
 
 
-def main():
+def fetch_all_threads():
     """Shows basic usage of the Gmail API.
     Lists the user's Gmail labels.
     """
@@ -159,6 +160,24 @@ def main():
         # TODO(developer) - Handle errors from gmail API.
         logging.info(f'An error occurred: {error}')
 
+
+def main():
+
+    parser = argparse.ArgumentParser(description='Action')
+
+    parser.add_argument('action', type=str, choices=['fetch', 'spit', 'unsub'])
+
+    args = parser.parse_args()
+
+    if args.action == 'fetch':
+        fetch_all_threads()
+    elif args.action == 'spit':
+        export_all_senders()
+    elif args.action == 'unsub':
+        do_unsubscribe()
+    else:
+        logging.INFO('Nothing to do')
+        return
 
 if __name__ == '__main__':
     main()

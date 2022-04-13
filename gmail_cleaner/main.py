@@ -1,6 +1,7 @@
 import argparse
 import os.path
 import base64
+import csv
 import logging
 import shelve
 import socket
@@ -58,8 +59,9 @@ def prompt_user(question):
 
 
 def fetch_all_threads():
-    """Shows basic usage of the Gmail API.
-    Lists the user's Gmail labels.
+    """
+    Fetches all threads and import unsubscribable sender emails and threads into
+    persistant dictionary using shelve
     """
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
@@ -116,7 +118,7 @@ def fetch_all_threads():
         logging.info("Processing {} total number of threads".format(len(threads)))
 
 
-        with shelve.open('senders.db') as senders:
+        with shelve.open('senders.db', writeback=True) as senders:
             # senders is a a dict where sender email is used as a uid as a key and sender obj as the value
 
             # builds master dictionary of senders
@@ -127,9 +129,39 @@ def fetch_all_threads():
                 headers = Headers(msg['payload']['headers'])
                 if headers.unsubscribable():
                     add_to_senders(senders, t['id'], headers)
+                    senders.sync()
 
             logging.info("Found {num} unique senders".format(num=len(senders)))
 
+    except HttpError as error:
+        # TODO(developer) - Handle errors from gmail API.
+        logging.info(f'An error occurred: {error}')
+
+def generate_senders_csv():
+    """
+    Generates a CSV file containing all unique senders and default remove action to false
+    """
+    with shelve.open('senders.db') as senders:
+        logging.info('{} of unique senders'.format(len(senders)))
+
+        for sender_email, sender_obj in senders.items():
+            logging.info(logging.info(sender_obj.thread_ids))
+
+        # with open('senders.csv', 'w', newline='') as csvfile:
+        #     fieldnames = ['sender_name', 'sender_email', 'num_of_threads', 'to_unsub']
+        #     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+        #     writer.writeheader()
+        #     for sender_email, sender_obj in senders.items():
+        #         logging.info('writing row for {}'.format(sender_obj.name))
+        #         writer.writerow(
+        #             {
+        #                 'sender_name': sender_obj.name,
+        #                 'sender_email': sender_email,
+        #                 'num_of_threads': len(sender_obj.thread_ids),
+        #                 'to_unsub': False
+        #             }
+        #         )
 
         # builds truth table from user input
         # user_response = {}
@@ -157,9 +189,6 @@ def fetch_all_threads():
         #         logging.info("skipping {} as user instructed".format(sender_email))
 
 
-    except HttpError as error:
-        # TODO(developer) - Handle errors from gmail API.
-        logging.info(f'An error occurred: {error}')
 
 
 def main():
@@ -173,7 +202,7 @@ def main():
     if args.action == 'fetch':
         fetch_all_threads()
     elif args.action == 'spit':
-        export_all_senders()
+        generate_senders_csv()
     elif args.action == 'unsub':
         do_unsubscribe()
     else:

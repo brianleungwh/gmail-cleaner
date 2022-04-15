@@ -57,11 +57,9 @@ def prompt_user(question):
         else:
             print("Please respond by yes or no.")
 
-
-def fetch_all_threads():
+def get_gmail_service():
     """
-    Fetches all threads and import unsubscribable sender emails and threads into
-    persistant dictionary using shelve
+    Returns authenticated gmail client
     """
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
@@ -78,14 +76,23 @@ def fetch_all_threads():
             flow = InstalledAppFlow.from_client_secrets_file(
                 'credentials.json', SCOPES)
             creds = flow.run_local_server(port=8080, open_browser=False)
+
         # Save the credentials for the next run
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
 
+    # Call the Gmail API
+    gmail_service = build('gmail', 'v1', credentials=creds)
+    return gmail_service
+
+def fetch_all_threads():
+    """
+    Fetches all threads and import unsubscribable sender emails and threads into
+    persistant dictionary using shelve
+    """
     # Main logic begins
     try:
-        # Call the Gmail API
-        gmail_service = build('gmail', 'v1', credentials=creds)
+        gmail_service = get_gmail_service()
         user_email = gmail_service.users().getProfile(userId='me').execute().get('emailAddress')
 
         # max_results = 500

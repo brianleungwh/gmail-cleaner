@@ -181,12 +181,19 @@ def unsub():
 
             for row in reader:
                 if row['to_unsub'] == 'TRUE':
-                    sender_email = row['sender_email']
-                    logging.info('Processing unsubscribe from {}'.format(sender_email))
-                    sender_obj = senders[sender_email]
-                    sender_obj.do_unsubscribe(user_email, gmail_service)
-                    for t in sender_obj.thread_ids:
-                        logging.info('Removing thread {}'.format(t))
+                    try:
+                        sender_email = row['sender_email']
+                        logging.info('Processing unsubscribe from {}'.format(sender_email))
+                        sender_obj = senders[sender_email]
+                        sender_obj.do_unsubscribe(user_email, gmail_service)
+                        logging.info('sender has mailto link: {}'.format(str(sender_obj.has_mailto_link())))
+                        for t_id in sender_obj.thread_ids:
+                            thread = gmail_service.users().threads().trash(userId='me', id=t_id).execute()
+                            logging.info('Trashed thread {}'.format(thread['id']))
+
+                    except HttpError as error:
+                        # TODO(developer) - Handle errors from gmail API.
+                        logging.info(f'An error occurred: {error}')
 
         # builds truth table from user input
         # user_response = {}

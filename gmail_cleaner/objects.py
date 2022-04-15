@@ -41,6 +41,7 @@ class Sender(object):
         Makes request to unsub from sender.
         Prefers mailto method. If mailto method not available, try http method with both GET and POST
         """
+        logging.info('Processing unsubscribe from {}'.format(self.email))
         if self.has_mailto_link():
             mailto_unsub_link = self.get_mailto_unsub_link()
             message = create_message(

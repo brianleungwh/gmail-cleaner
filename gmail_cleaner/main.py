@@ -171,6 +171,9 @@ def unsub():
     """
     Unsubscribe from marked senders reading from CSV
     """
+    gmail_service = get_gmail_service()
+    user_email = gmail_service.users().getProfile(userId='me').execute().get('emailAddress')
+
     with open('marked_senders.csv', newline='') as csvfile:
         reader = csv.DictReader(csvfile)
 
@@ -181,7 +184,7 @@ def unsub():
                     sender_email = row['sender_email']
                     logging.info('Processing unsubscribe from {}'.format(sender_email))
                     sender_obj = senders[sender_email]
-                    # sender_obj.do_unsubscribe()
+                    sender_obj.do_unsubscribe(user_email, gmail_service)
                     for t in sender_obj.thread_ids:
                         logging.info('Removing thread {}'.format(t))
 

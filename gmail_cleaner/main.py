@@ -144,24 +144,39 @@ def generate_senders_csv():
     with shelve.open('senders.db') as senders:
         logging.info('{} of unique senders'.format(len(senders)))
 
-        for sender_email, sender_obj in senders.items():
-            logging.info(logging.info(sender_obj.thread_ids))
+        with open('senders.csv', 'w', newline='') as csvfile:
+            fieldnames = ['sender_name', 'sender_email', 'num_of_threads', 'to_unsub']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
-        # with open('senders.csv', 'w', newline='') as csvfile:
-        #     fieldnames = ['sender_name', 'sender_email', 'num_of_threads', 'to_unsub']
-        #     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for sender_email, sender_obj in senders.items():
+                logging.info('writing row for {}'.format(sender_obj.name))
+                writer.writerow(
+                    {
+                        'sender_name': sender_obj.name,
+                        'sender_email': sender_email,
+                        'num_of_threads': len(sender_obj.thread_ids),
+                        'to_unsub': False
+                    }
+                )
 
-        #     writer.writeheader()
-        #     for sender_email, sender_obj in senders.items():
-        #         logging.info('writing row for {}'.format(sender_obj.name))
-        #         writer.writerow(
-        #             {
-        #                 'sender_name': sender_obj.name,
-        #                 'sender_email': sender_email,
-        #                 'num_of_threads': len(sender_obj.thread_ids),
-        #                 'to_unsub': False
-        #             }
-        #         )
+def unsub():
+    """
+    Unsubscribe from marked senders reading from CSV
+    """
+    with open('marked_senders.csv', newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+
+        with shelve.open('senders.db') as senders:
+
+            for row in reader:
+                if row['to_unsub'] == 'TRUE':
+                    sender_email = row['sender_email']
+                    logging.info('Processing unsubscribe from {}'.format(sender_email))
+                    sender_obj = senders[sender_email]
+                    # sender_obj.do_unsubscribe()
+                    for t in sender_obj.thread_ids:
+                        logging.info('Removing thread {}'.format(t))
 
         # builds truth table from user input
         # user_response = {}
@@ -204,7 +219,7 @@ def main():
     elif args.action == 'spit':
         generate_senders_csv()
     elif args.action == 'unsub':
-        do_unsubscribe()
+        unsub()
     else:
         logging.INFO('Nothing to do')
         return

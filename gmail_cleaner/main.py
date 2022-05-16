@@ -11,6 +11,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from sqlitedict import SqliteDict
 
 from gmail_cleaner.objects import Headers, Sender
 
@@ -167,6 +168,28 @@ def generate_senders_csv():
                     }
                 )
 
+
+def load_marked_senders():
+    """
+    Parses marked senders csv into sqlitedb
+    """
+    unsubscribes = SqliteDict('gmail_cleaner.sqlite', tablename='unsubscribes', autocommit=True)
+
+    with open('marked_senders.csv', newline='') as csvfile:
+        count = 0
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            if row['to_unsub'] == 'TRUE':
+                sender_email = row['sender_email']
+                unsubscribes[sender_email] = {
+                    'sender_name': row['sender_name'],
+                    'num_of_threads': row['num_of_threads'],
+                    'processed': False
+                }
+                count += 1
+                logging.info('Wrote {} to sqlitedb'.format(sender_email))
+        logging.info('Wrote {} senders to unsubscribes table'.format(str(count)))
+
 def unsub():
     """
     Unsubscribe from marked senders reading from CSV
@@ -234,7 +257,13 @@ def main():
 
     parser = argparse.ArgumentParser(description='Action')
 
-    parser.add_argument('action', type=str, choices=['fetch', 'spit', 'unsub'])
+    parser.add_argument('action', type=str, choices=[
+        'fetch',
+        'spit',
+        'read',
+        'unsub',
+    ])
+
 
     args = parser.parse_args()
 
@@ -242,6 +271,8 @@ def main():
         fetch_all_threads()
     elif args.action == 'spit':
         generate_senders_csv()
+    elif args.action == 'read':
+        load_marked_senders()
     elif args.action == 'unsub':
         unsub()
     else:

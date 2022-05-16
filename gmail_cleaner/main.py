@@ -197,30 +197,29 @@ def unsub():
     gmail_service = get_gmail_service()
     user_email = gmail_service.users().getProfile(userId='me').execute().get('emailAddress')
 
-    with open('marked_senders.csv', newline='') as csvfile:
-        reader = csv.DictReader(csvfile)
+    unsubscribes = SqliteDict('gmail_cleaner.sqlite', tablename='unsubscribes', autocommit=True)
 
-        with shelve.open('senders.db') as senders:
+    with shelve.open('senders.db') as senders:
 
-            threads_trashed = 0
-            senders_unsub = 0
+        threads_trashed = 0
+        senders_unsub = 0
 
-            for row in reader:
-                if row['to_unsub'] == 'TRUE':
-                    try:
-                        sender_email = row['sender_email']
-                        sender_obj = senders[sender_email]
-                        sender_obj.do_unsubscribe(user_email, gmail_service)
-                        # add another csv to keep track of processed entries
-                        senders_unsub += 1
-                        for t_id in sender_obj.thread_ids:
-                            thread = gmail_service.users().threads().trash(userId='me', id=t_id).execute()
-                            logging.info('Trashed thread {}'.format(thread['id']))
-                            threads_trashed += 1
+        for sender in unsubscribes:
+            sender_email = sender['sender_email']
+            try:
+                sender_email = row['sender_email']
+                sender_obj = senders[sender_email]
+                sender_obj.do_unsubscribe(user_email, gmail_service)
+                # add another csv to keep track of processed entries
+                senders_unsub += 1
+                for t_id in sender_obj.thread_ids:
+                    thread = gmail_service.users().threads().trash(userId='me', id=t_id).execute()
+                    logging.info('Trashed thread {}'.format(thread['id']))
+                    threads_trashed += 1
 
-                    except HttpError as error:
-                        # TODO(developer) - Handle errors from gmail API.
-                        logging.info(f'An error occurred: {error}')
+            except HttpError as error:
+                # TODO(developer) - Handle errors from gmail API.
+                logging.info(f'An error occurred: {error}')
 
             logging.info('Trashed {} threads'.format(str(threads_trashed)))
             logging,infor('Unsub from {} of senders'.format(str(senders_unsub)))

@@ -11,6 +11,7 @@ google-auth-httplib2 = "^0.1.0"
 google-auth-oauthlib = "^0.4.6"
 case-converter = "^1.0.2"
 requests = "^2.27.1"
+sqlitedict = "^2.0.0"
 
 
 [tool.poetry.dev-dependencies]

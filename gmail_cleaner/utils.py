@@ -1,3 +1,7 @@
+import base64
+import logging
+
+
 from email.mime.text import MIMEText
 
 from googleapiclient import errors
@@ -16,10 +20,13 @@ def create_message(sender, to, subject, message_text):
         An object containing a base64url encoded email object.
     """
     message = MIMEText(message_text)
+    logging.info('TO: {}'.format(to))
+
     message['to'] = to
     message['from'] = sender
     message['subject'] = subject
-    return {'raw': base64.urlsafe_b64encode(message.as_string())}
+    raw_msg = base64.urlsafe_b64encode(message.as_string().encode('utf-8'))
+    return {'raw': raw_msg.decode('utf-8')}
 
 def send_message(service, user_id, message):
     """Send an email message.
@@ -34,9 +41,8 @@ def send_message(service, user_id, message):
     Sent Message.
     """
     try:
-        message = (service.users().messages().send(userId=user_id, body=message)
-                    .execute())
-        print('Message Id: %s' % message['id'])
+        message = service.users().messages().send(userId=user_id, body=message).execute()
+        logging.info('Message Id: %s' % message['id'])
         return message
-    except (errors.HttpError, error) as e:
-        print('An error occurred: %s' % e)
+    except errors.HttpError as e:
+        logging.error('An error occurred: %s' % e)

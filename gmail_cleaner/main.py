@@ -179,21 +179,28 @@ def unsub():
 
         with shelve.open('senders.db') as senders:
 
+            threads_trashed = 0
+            senders_unsub = 0
+
             for row in reader:
                 if row['to_unsub'] == 'TRUE':
                     try:
                         sender_email = row['sender_email']
-                        logging.info('Processing unsubscribe from {}'.format(sender_email))
                         sender_obj = senders[sender_email]
                         sender_obj.do_unsubscribe(user_email, gmail_service)
-                        logging.info('sender has mailto link: {}'.format(str(sender_obj.has_mailto_link())))
+                        # add another csv to keep track of processed entries
+                        senders_unsub += 1
                         for t_id in sender_obj.thread_ids:
                             thread = gmail_service.users().threads().trash(userId='me', id=t_id).execute()
                             logging.info('Trashed thread {}'.format(thread['id']))
+                            threads_trashed += 1
 
                     except HttpError as error:
                         # TODO(developer) - Handle errors from gmail API.
                         logging.info(f'An error occurred: {error}')
+
+            logging.info('Trashed {} threads'.format(str(threads_trashed)))
+            logging,infor('Unsub from {} of senders'.format(str(senders_unsub)))
 
         # builds truth table from user input
         # user_response = {}

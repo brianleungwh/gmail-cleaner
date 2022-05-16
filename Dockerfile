@@ -9,6 +9,7 @@ COPY . .
 
 RUN /root/.local/bin/poetry install
 
+RUN chmod +x -R .
 
 EXPOSE 8080
 

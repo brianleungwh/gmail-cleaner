@@ -43,6 +43,7 @@ class Sender(object):
         """
         logging.info('Processing unsubscribe from {}'.format(self.email))
         if self.has_mailto_link():
+            print('A')
             mailto_unsub_link = self.get_mailto_unsub_link()
             message = create_message(
                 user_email,
@@ -52,10 +53,16 @@ class Sender(object):
             )
             send_message(gmail_service, 'me', message)
         else:
+            print('B')
             # make both http GET and POST to list of unsub links
-            for link in self.unsub_links:
-                requests.get(link.action_link())
-                requests.post(link.action_link())
+            try:
+                for link in self.unsub_links:
+                    print(link.action_link())
+                    requests.get(link.action_link())
+                    requests.post(link.action_link())
+            except (Exception, ConnectionRefusedError) as e:
+                print('C')
+                logging.error('Connection error unsubscribing from {}'.format(link.action_link()))
 
 
 class UnsubscribeLink(object):

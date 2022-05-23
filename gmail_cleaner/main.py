@@ -204,13 +204,10 @@ def unsub():
         threads_trashed = 0
         senders_unsub = 0
 
-        for sender in unsubscribes:
-            sender_email = sender['sender_email']
+        for sender_email, sender_dict in unsubscribes.items():
             try:
-                sender_email = row['sender_email']
                 sender_obj = senders[sender_email]
                 sender_obj.do_unsubscribe(user_email, gmail_service)
-                # add another csv to keep track of processed entries
                 senders_unsub += 1
                 for t_id in sender_obj.thread_ids:
                     thread = gmail_service.users().threads().trash(userId='me', id=t_id).execute()
@@ -221,8 +218,12 @@ def unsub():
                 # TODO(developer) - Handle errors from gmail API.
                 logging.info(f'An error occurred: {error}')
 
-            logging.info('Trashed {} threads'.format(str(threads_trashed)))
-            logging,infor('Unsub from {} of senders'.format(str(senders_unsub)))
+            # update entry back in sqlitedb
+            print('updating sqlitedb')
+            del unsubscribes[sender_email]
+
+        logging.info('Trashed {} threads'.format(str(threads_trashed)))
+        logging.info('Unsub from {} of senders'.format(str(senders_unsub)))
 
         # builds truth table from user input
         # user_response = {}

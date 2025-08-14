@@ -19,7 +19,8 @@ dependencies = [
     "google-auth-httplib2>=0.2.0",
     "google-api-python-client>=2.127.0",
     "python-dotenv>=1.0.1",
-    "rich>=13.7.1"
+    "rich>=13.7.1",
+    "ipdb>=0.13.13",
 ]
 
 [build-system]

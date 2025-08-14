@@ -2,6 +2,8 @@
 """
 Gmail Cleaner - Pattern-based email cleanup without AI
 """
+from logging import disable
+import ipdb
 
 import os
 import json
@@ -32,6 +34,13 @@ load_dotenv()
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
 console = Console()
+
+
+@dataclass
+class ThreadInfo:
+    """Thread information for processing"""
+    id: str
+    messages: List[Dict]  # List of message data from the thread
 
 
 @dataclass
@@ -69,10 +78,9 @@ class GmailCleaner:
         # Set up signal handler for graceful shutdown
         signal.signal(signal.SIGINT, self._handle_interrupt)
         
-        # Load junk detection data
-        console.print("[dim]Loading junk detection configuration...[/dim]")
+        # Load junk senders list
+        console.print("[dim]Loading junk senders list...[/dim]")
         self.junk_senders = self._load_junk_senders()
-        self.junk_patterns = self._load_junk_patterns()
         console.print("[dim]Configuration loaded successfully.[/dim]\n")
     
     def _handle_interrupt(self, signum, frame):
@@ -96,30 +104,6 @@ class GmailCleaner:
                 return senders
         return set()
     
-    def _load_junk_patterns(self) -> Dict:
-        """Load junk detection patterns from JSON file"""
-        patterns_file = Path('junk_patterns.json')
-        if patterns_file.exists():
-            with open(patterns_file, 'r') as f:
-                patterns = json.load(f)
-                console.print(f"[green]Loaded junk patterns from junk_patterns.json[/green]")
-                return patterns
-        else:
-            console.print("[yellow]Warning: junk_patterns.json not found, using sender list only[/yellow]")
-            return {
-                'subject_patterns': [],
-                'sender_name_patterns': [],
-                'snippet_patterns': [],
-                'domain_patterns': [],
-                'scoring': {
-                    'subject_weight': 3,
-                    'sender_weight': 2,
-                    'snippet_weight': 2,
-                    'domain_weight': 4,
-                    'threshold': 5,
-                    'auto_delete_threshold': 8
-                }
-            }
     
     def _authenticate_gmail(self):
         """Authenticate and return Gmail service instance"""
@@ -151,67 +135,28 @@ class GmailCleaner:
         # If no angle brackets, assume the whole string is the email
         return sender.strip().lower()
     
-    def _extract_domain(self, email: str) -> str:
-        """Extract domain from email address"""
-        if '@' in email:
-            return email.split('@')[1].lower()
-        return ''
     
-    def _calculate_pattern_score(self, email: EmailInfo) -> Tuple[float, List[str]]:
-        """Calculate junk score based on pattern matching"""
-        score = 0
-        reasons = []
-        scoring = self.junk_patterns.get('scoring', {})
+    def detect_junk(self, thread: ThreadInfo) -> JunkDetectionResult:
+        """Enhanced aggressive mode: Check junk senders first, then delete everything else"""
+        # Check the first message's sender against junk patterns
+        if thread.messages:
+            first_message = thread.messages[0]
+            headers = {h['name']: h['value'] for h in first_message['payload'].get('headers', [])}
+            sender = headers.get('From', '(Unknown Sender)')
+            sender_email = self._extract_email_address(sender)
+            
+            # First check: sender pattern match from junk_senders.txt
+            for junk_pattern in self.junk_senders:
+                if junk_pattern in sender_email:
+                    return JunkDetectionResult(
+                        is_junk=True,
+                        score=100,
+                        reasons=[f"Sender '{sender_email}' matches junk pattern '{junk_pattern}'"],
+                        confidence='high'
+                    )
         
-        # Check subject patterns - count ALL matches
-        subject_lower = email.subject.lower()
-        subject_matches = 0
-        for pattern in self.junk_patterns.get('subject_patterns', []):
-            if pattern.lower() in subject_lower:
-                subject_matches += 1
-                reasons.append(f"Subject contains '{pattern}'")
-        if subject_matches > 0:
-            score += subject_matches * scoring.get('subject_weight', 3)
-        
-        # Check sender name patterns - count ALL matches
-        sender_lower = email.sender.lower()
-        sender_matches = 0
-        for pattern in self.junk_patterns.get('sender_name_patterns', []):
-            if pattern.lower() in sender_lower:
-                sender_matches += 1
-                reasons.append(f"Sender contains '{pattern}'")
-        if sender_matches > 0:
-            score += sender_matches * scoring.get('sender_weight', 2)
-        
-        # Check snippet patterns - count ALL matches
-        snippet_lower = email.snippet.lower()
-        snippet_matches = 0
-        for pattern in self.junk_patterns.get('snippet_patterns', []):
-            if pattern.lower() in snippet_lower:
-                snippet_matches += 1
-                reasons.append(f"Content contains '{pattern}'")
-        if snippet_matches > 0:
-            score += snippet_matches * scoring.get('snippet_weight', 2)
-        
-        # Check domain patterns - count ALL matches
-        email_addr = self._extract_email_address(email.sender)
-        domain = self._extract_domain(email_addr)
-        domain_matches = 0
-        for pattern in self.junk_patterns.get('domain_patterns', []):
-            if pattern.lower() in domain:
-                domain_matches += 1
-                reasons.append(f"Domain contains '{pattern}'")
-        if domain_matches > 0:
-            score += domain_matches * scoring.get('domain_weight', 4)
-        
-        return score, reasons
-    
-    def detect_junk(self, email: EmailInfo) -> JunkDetectionResult:
-        """Aggressive mode: Delete ALL emails that reach this point (no labels, not important, not starred)"""
-        sender_email = self._extract_email_address(email.sender)
-        
-        # AGGRESSIVE MODE: Delete everything since emails are pre-filtered
-        # Only emails without labels, not marked important, and not starred reach this point
+        # AGGRESSIVE MODE: Delete everything else since threads are pre-filtered
+        # Only threads without labels, not marked important, and not starred reach this point
         self.aggressive_deletes += 1
         return JunkDetectionResult(
             is_junk=True,
@@ -220,79 +165,95 @@ class GmailCleaner:
             confidence='high'
         )
     
-    def get_emails_batch(self, page_token: Optional[str] = None, batch_size: int = 100) -> tuple[List[EmailInfo], Optional[str]]:
-        """Fetch a batch of emails without any labels, important markers, or stars"""
+    def get_threads_batch(self, page_token: Optional[str] = None, batch_size: int = 100) -> tuple[List[ThreadInfo], Optional[str]]:
+        """Fetch a batch of threads and their messages for processing"""
         try:
-            # Get all emails from anywhere excluding those with user labels, marked as important, or starred
-            # Note: This will get emails from inbox, sent, etc. but our filtering will handle that
-            results = self.service.users().messages().list(
+            # Get ALL threads from inbox - we'll do filtering manually
+            results = self.service.users().threads().list(
                 userId='me',
                 maxResults=batch_size,
                 pageToken=page_token,
-                q='-has:userlabels -is:important -is:starred'  # Exclude protected emails
+                q='in:inbox'  # Just get inbox threads
             ).execute()
             
-            messages = results.get('messages', [])
+            threads = results.get('threads', [])
             next_page_token = results.get('nextPageToken')
             
-            emails = []
-            for msg in messages:
-                # Get full message details
-                message = self.service.users().messages().get(
+            console.print(f"[dim]Gmail API returned {len(threads)} threads, next_page_token: {next_page_token[:20] + '...' if next_page_token else 'None'}[/dim]")
+            
+            if not threads:
+                console.print(f"[yellow]Gmail API returned no threads for current page[/yellow]")
+                return [], next_page_token
+            
+            threads_to_process = []
+            threads_protected = 0
+            
+            for thread in threads:
+                thread_id = thread['id']
+                console.print(f"[dim]Processing thread ID: {thread_id}[/dim]")
+                
+                # Get full thread details with all messages
+                thread_data = self.service.users().threads().get(
                     userId='me',
-                    id=msg['id'],
+                    id=thread_id,
                     format='metadata',
                     metadataHeaders=['From', 'Subject', 'Date']
                 ).execute()
                 
-                # Skip if email has any user labels, is marked important, or is starred (double-check)
-                label_ids = message.get('labelIds', [])
-                system_labels = {'INBOX', 'SPAM', 'TRASH', 'UNREAD', 'SENT', 'DRAFT', 'IMPORTANT', 'STARRED', 'CATEGORY_PERSONAL', 
-                               'CATEGORY_SOCIAL', 'CATEGORY_PROMOTIONS', 'CATEGORY_UPDATES', 'CATEGORY_FORUMS'}
-                
-                # Skip if marked as IMPORTANT or STARRED
-                if 'IMPORTANT' in label_ids or 'STARRED' in label_ids:
+                messages = thread_data.get('messages', [])
+                if not messages:
+                    console.print(f"[dim]Thread {thread_id} has no messages, skipping[/dim]")
                     continue
                 
-                # Skip if not in INBOX (must have INBOX label to be processed)
-                if 'INBOX' not in label_ids:
-                    continue
+                # Check ONLY the first message in the thread for protection
+                first_message = messages[0]
+                first_label_ids = first_message.get('labelIds', [])
                 
-                # Skip SENT, DRAFT, SPAM, TRASH emails
-                if any(label in label_ids for label in ['SENT', 'DRAFT', 'SPAM', 'TRASH']):
-                    continue
+                # Check if thread is protected (based on first message)
+                # Protected if: IMPORTANT, STARRED, or has custom labels (Label_*)
+                has_custom_label = any(label.startswith('Label_') for label in first_label_ids)
+                is_protected = ('IMPORTANT' in first_label_ids or 
+                               'STARRED' in first_label_ids or 
+                               has_custom_label)
                 
-                # If email has any label that's not a system label, skip it
-                user_labels = [label for label in label_ids if label not in system_labels]
-                if user_labels:
-                    continue
+                if is_protected:
+                    console.print(f"[dim]Thread {thread_id} is PROTECTED (important/starred/custom label)[/dim]")
+                    threads_protected += 1
+                    continue  # Skip this entire thread
                 
-                # Extract metadata
-                headers = {h['name']: h['value'] for h in message['payload'].get('headers', [])}
-                
-                email_info = EmailInfo(
-                    id=message['id'],
-                    subject=headers.get('Subject', '(No Subject)'),
-                    sender=headers.get('From', '(Unknown Sender)'),
-                    date=headers.get('Date', ''),
-                    snippet=message.get('snippet', ''),
-                    labels=label_ids
+                # Add unprotected thread to list for processing
+                thread_info = ThreadInfo(
+                    id=thread_id,
+                    messages=messages
                 )
-                emails.append(email_info)
+                threads_to_process.append(thread_info)
             
-            return emails, next_page_token
+            console.print(f"[dim]Found {len(threads_to_process)} unprotected threads ({threads_protected} protected)[/dim]")
+            
+            return threads_to_process, next_page_token
             
         except HttpError as error:
             console.print(f"[red]An error occurred: {error}[/red]")
             return [], None
     
-    def delete_email(self, email_info: EmailInfo, detection: JunkDetectionResult):
-        """Move email to trash"""
-        sender_email = self._extract_email_address(email_info.sender)
+    def delete_thread(self, thread: ThreadInfo, detection: JunkDetectionResult):
+        """Move all messages in thread to trash"""
+        # Get first message info for display
+        if not thread.messages:
+            return
+        
+        first_message = thread.messages[0]
+        headers = {h['name']: h['value'] for h in first_message['payload'].get('headers', [])}
+        subject = headers.get('Subject', '(No Subject)')
+        sender = headers.get('From', '(Unknown Sender)')
+        sender_email = self._extract_email_address(sender)
+        
+        
+        messages_count = len(thread.messages)
         
         if self.dry_run:
             confidence_color = {'high': 'green', 'medium': 'yellow', 'low': 'red'}.get(detection.confidence, 'white')
-            console.print(f"[red]WOULD DELETE[/red] - [bold]Subject:[/bold] '{email_info.subject[:60]}{'...' if len(email_info.subject) > 60 else ''}'")
+            console.print(f"[red]WOULD DELETE THREAD[/red] ({messages_count} messages) - [bold]Subject:[/bold] '{subject[:60]}{'...' if len(subject) > 60 else ''}'")
             console.print(f"    [dim]From:[/dim] {sender_email}")
             console.print(f"    [{confidence_color}]Confidence: {detection.confidence.upper()} | Score: {detection.score:.1f}[/{confidence_color}]")
             
@@ -304,13 +265,15 @@ class GmailCleaner:
             console.print()
         else:
             try:
-                self.service.users().messages().trash(userId='me', id=email_info.id).execute()
-                console.print(f"[green]DELETED[/green] - [bold]Subject:[/bold] '{email_info.subject[:60]}{'...' if len(email_info.subject) > 60 else ''}'")
+                # Delete the entire thread at once using threads API
+                self.service.users().threads().trash(userId='me', id=thread.id).execute()
+                
+                console.print(f"[green]DELETED THREAD[/green] ({messages_count} messages) - [bold]Subject:[/bold] '{subject[:60]}{'...' if len(subject) > 60 else ''}'")
                 console.print(f"    [dim]From:[/dim] {sender_email}")
                 console.print(f"    [green]Confidence: {detection.confidence.upper()} | Score: {detection.score:.1f}[/green]")
                 console.print()
             except HttpError as error:
-                console.print(f"[red]ERROR DELETING[/red] - [bold]Subject:[/bold] '{email_info.subject[:60]}{'...' if len(email_info.subject) > 60 else ''}'")
+                console.print(f"[red]ERROR DELETING THREAD[/red] - [bold]Subject:[/bold] '{subject[:60]}{'...' if len(subject) > 60 else ''}'")
                 console.print(f"    [dim]From:[/dim] {sender_email}")
                 console.print(f"    [red]Error: {error}[/red]")
                 console.print()
@@ -359,7 +322,8 @@ class GmailCleaner:
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            console=console
+            console=console,
+            disable=True
         ) as progress:
             
             # Create progress task
@@ -383,49 +347,69 @@ class GmailCleaner:
                 if total_limit and (total_processed + batch_size > total_limit):
                     current_batch_size = total_limit - total_processed
                 
-                # Fetch batch of emails
-                emails, page_token = self.get_emails_batch(page_token, current_batch_size)
+                # Fetch batch of threads
+                console.print(f"[dim]Fetching batch with page_token: {page_token[:20] + '...' if page_token else 'None'}[/dim]")
+                threads, next_page_token = self.get_threads_batch(page_token, current_batch_size)
                 
-                if not emails:
+                # Only break if no threads AND no more pages
+                if not threads and not next_page_token:
+                    console.print(f"[dim]No more threads to process (threads: {len(threads)}, next_page_token: {next_page_token})[/dim]")
                     break
                 
-                # Truncate emails list if it would exceed the limit
-                if total_limit and (total_processed + len(emails) > total_limit):
-                    emails = emails[:total_limit - total_processed]
-                    console.print(f"[yellow]Limiting batch to {len(emails)} emails to respect limit of {total_limit}[/yellow]")
+                # Update page token for next iteration
+                page_token = next_page_token
+                console.print(f"[dim]Updated page_token for next iteration: {page_token[:20] + '...' if page_token else 'None'}[/dim]")
+                
+                # Skip to next batch if current batch is empty but there are more pages
+                if not threads:
+                    console.print(f"[dim]Batch had no eligible threads after filtering, checking next batch...[/dim]")
+                    continue
+                
+                # Truncate threads list if it would exceed the limit
+                if total_limit and (total_processed + len(threads) > total_limit):
+                    threads = threads[:total_limit - total_processed]
+                    console.print(f"[yellow]Limiting batch to {len(threads)} threads to respect limit of {total_limit}[/yellow]")
                 
                 # Analyze batch using pattern matching
-                console.print(f"\n[cyan]Processing batch of {len(emails)} emails...[/cyan]")
+                console.print(f"\n[cyan]Processing batch of {len(threads)} threads...[/cyan]")
                 
                 batch_deleted = 0
                 batch_kept = 0
                 
-                # Process each email
-                for i, email in enumerate(emails, 1):
-                    sender_email = self._extract_email_address(email.sender)
-                    console.print(f"[dim]({i}/{len(emails)}) Analyzing: {sender_email}[/dim]")
+                # Process each thread
+                for i, thread in enumerate(threads, 1):
+                    # Get first message info for display
+                    if thread.messages:
+                        first_message = thread.messages[0]
+                        headers = {h['name']: h['value'] for h in first_message['payload'].get('headers', [])}
+                        sender = headers.get('From', '(Unknown Sender)')
+                        sender_email = self._extract_email_address(sender)
+                        console.print(f"[dim]({i}/{len(threads)}) Analyzing thread from: {sender_email}[/dim]")
                     
-                    detection = self.detect_junk(email)
+                    detection = self.detect_junk(thread)
                     
                     if detection.is_junk:
-                        self.delete_email(email, detection)
-                        self.deleted_count += 1
-                        batch_deleted += 1
+                        self.delete_thread(thread, detection)
+                        # Count all messages in thread as deleted
+                        messages_deleted = len([m for m in thread.messages if 'INBOX' in m.get('labelIds', [])])
+                        self.deleted_count += messages_deleted
+                        batch_deleted += messages_deleted
                     else:
-                        # Show kept emails in verbose mode
-                        console.print(f"[green]KEEPING[/green] - [bold]Subject:[/bold] '{email.subject[:60]}{'...' if len(email.subject) > 60 else ''}'")
-                        console.print(f"    [dim]From:[/dim] {sender_email}")
-                        if detection.score > 0:
-                            console.print(f"    [yellow]Score: {detection.score:.1f} (below threshold {self.junk_patterns.get('scoring', {}).get('threshold', 5)})[/yellow]")
-                            if detection.reasons:
-                                console.print(f"    [dim]Weak indicators: {', '.join(detection.reasons[:2])}[/dim]")
-                        else:
-                            console.print(f"    [green]Score: {detection.score:.1f} (no junk indicators)[/green]")
-                        console.print()
-                        self.kept_count += 1
-                        batch_kept += 1
+                        # Show kept threads in verbose mode
+                        if thread.messages:
+                            first_message = thread.messages[0]
+                            headers = {h['name']: h['value'] for h in first_message['payload'].get('headers', [])}
+                            subject = headers.get('Subject', '(No Subject)')
+                            console.print(f"[green]KEEPING THREAD[/green] ({len(thread.messages)} messages) - [bold]Subject:[/bold] '{subject[:60]}{'...' if len(subject) > 60 else ''}'")
+                            console.print(f"    [dim]From:[/dim] {sender_email}")
+                            console.print(f"    [green]No junk sender match found[/green]")
+                            console.print()
+                        messages_kept = len([m for m in thread.messages if 'INBOX' in m.get('labelIds', [])])
+                        self.kept_count += messages_kept
+                        batch_kept += messages_kept
                     
                     self.processed_count += 1
+                    # Update total processed based on thread count
                     total_processed += 1
                     
                     # Update progress
@@ -438,21 +422,17 @@ class GmailCleaner:
                 
                 # Show detailed batch summary
                 console.print(f"\n[bold cyan]Batch Summary:[/bold cyan]")
-                console.print(f"  [green]Deleted: {batch_deleted}[/green] | [blue]Kept: {batch_kept}[/blue] | [yellow]Total in batch: {len(emails)}[/yellow]")
+                console.print(f"  [green]Messages Deleted: {batch_deleted}[/green] | [blue]Messages Kept: {batch_kept}[/blue] | [yellow]Threads in batch: {len(threads)}[/yellow]")
                 console.print(f"  [dim]Running totals - Processed: {self.processed_count} | Deleted: {self.deleted_count} | Kept: {self.kept_count}[/dim]")
                 
-                if page_token:
+                if next_page_token:
                     console.print(f"  [dim]More emails available for processing...[/dim]")
                 else:
-                    console.print(f"  [dim]No more emails to process.[/dim]")
+                    console.print(f"  [dim]Reached end of email list.[/dim]")
                 
                 # Check if interrupted during batch processing
                 if self.interrupted:
                     console.print("\n[yellow]Gracefully stopping after completing current batch.[/yellow]")
-                    break
-                
-                # Check if there are more emails
-                if not page_token:
                     break
                 
                 # Small delay to avoid rate limiting
@@ -512,6 +492,7 @@ class GmailCleaner:
 
 def main():
     """Main entry point"""
+
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Aggressive Gmail inbox cleaner - deletes ALL unlabeled emails')
     parser.add_argument('--limit', type=int, help='Maximum number of emails to process')
@@ -541,7 +522,7 @@ def main():
     
     # Create and run cleaner
     cleaner = GmailCleaner(dry_run=dry_run)
-    
+
     # Process emails with optional limit
     cleaner.process_emails(total_limit=args.limit)
 

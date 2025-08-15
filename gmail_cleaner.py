@@ -255,7 +255,7 @@ class GmailCleaner:
                 # Delete the entire thread at once using threads API
                 self.service.users().threads().trash(userId='me', id=thread.id).execute()
                 
-                console.print(f"[green]DELETED[/green] Thread ({messages_count} msgs): {subject[:50]}... from {sender_email}")
+                console.print(f"[red]DELETED[/red] Thread ({messages_count} msgs): {subject[:50]}... from {sender_email}")
             except HttpError as error:
                 console.print(f"[red]ERROR DELETING[/red] Thread: {error}")
     

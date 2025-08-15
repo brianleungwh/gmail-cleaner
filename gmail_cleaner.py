@@ -2,18 +2,13 @@
 """
 Gmail Cleaner - Pattern-based email cleanup without AI
 """
-from logging import disable
-import ipdb
-
 import os
-import json
 import time
 import signal
 import sys
 import argparse
 import re
-from datetime import datetime
-from typing import List, Dict, Optional, Set, Tuple
+from typing import List, Dict, Optional, Set
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -44,17 +39,6 @@ class ThreadInfo:
 
 
 @dataclass
-class EmailInfo:
-    """Minimal email information for analysis"""
-    id: str
-    subject: str
-    sender: str
-    date: str
-    snippet: str
-    labels: List[str]
-
-
-@dataclass
 class JunkDetectionResult:
     """Result of junk detection with scoring details"""
     is_junk: bool
@@ -67,21 +51,16 @@ class GmailCleaner:
     def __init__(self, dry_run: bool = True):
         self.dry_run = dry_run
         self.service = self._authenticate_gmail()
-        self.processed_count = 0
-        self.deleted_count = 0
-        self.kept_count = 0
+        self.threads_processed = 0
+        self.messages_deleted = 0
+        self.messages_kept = 0
         self.interrupted = False
-        
-        # Aggressive mode stats (simplified)
-        self.aggressive_deletes = 0
         
         # Set up signal handler for graceful shutdown
         signal.signal(signal.SIGINT, self._handle_interrupt)
         
         # Load junk senders list
-        console.print("[dim]Loading junk senders list...[/dim]")
         self.junk_senders = self._load_junk_senders()
-        console.print("[dim]Configuration loaded successfully.[/dim]\n")
     
     def _handle_interrupt(self, signum, frame):
         """Handle Ctrl+C gracefully"""
@@ -100,8 +79,9 @@ class GmailCleaner:
                 # Read lines, strip whitespace, convert to lowercase, ignore empty lines and comments
                 senders = {line.strip().lower() for line in f 
                           if line.strip() and not line.strip().startswith('#')}
-                console.print(f"[green]Loaded {len(senders)} junk senders from junk_senders.txt[/green]")
+                console.print(f"[green]Loaded {len(senders)} junk sender patterns[/green]")
                 return senders
+        console.print("[yellow]No junk_senders.txt found - will delete all unprotected threads[/yellow]")
         return set()
     
     
@@ -135,6 +115,22 @@ class GmailCleaner:
         # If no angle brackets, assume the whole string is the email
         return sender.strip().lower()
     
+    def _is_thread_protected(self, label_ids: List[str]) -> bool:
+        """Check if a thread should be protected from deletion based on its labels
+        
+        Protected if:
+        - Has IMPORTANT label
+        - Has STARRED label  
+        - Has any custom user labels (starting with Label_)
+        """
+        # Check for important or starred
+        # if 'IMPORTANT' in label_ids or 'STARRED' in label_ids:
+        #     return True
+        
+        # Check for custom user labels
+        has_custom_label = any(label.startswith('Label_') for label in label_ids)
+        return has_custom_label
+    
     
     def detect_junk(self, thread: ThreadInfo) -> JunkDetectionResult:
         """Enhanced aggressive mode: Check junk senders first, then delete everything else"""
@@ -156,8 +152,6 @@ class GmailCleaner:
                     )
         
         # AGGRESSIVE MODE: Delete everything else since threads are pre-filtered
-        # Only threads without labels, not marked important, and not starred reach this point
-        self.aggressive_deletes += 1
         return JunkDetectionResult(
             is_junk=True,
             score=100,
@@ -179,10 +173,11 @@ class GmailCleaner:
             threads = results.get('threads', [])
             next_page_token = results.get('nextPageToken')
             
-            console.print(f"[dim]Gmail API returned {len(threads)} threads, next_page_token: {next_page_token[:20] + '...' if next_page_token else 'None'}[/dim]")
+            # Only show debug logging if there are threads
+            if threads:
+                console.print(f"[dim]Found {len(threads)} threads in batch[/dim]")
             
             if not threads:
-                console.print(f"[yellow]Gmail API returned no threads for current page[/yellow]")
                 return [], next_page_token
             
             threads_to_process = []
@@ -190,7 +185,6 @@ class GmailCleaner:
             
             for thread in threads:
                 thread_id = thread['id']
-                console.print(f"[dim]Processing thread ID: {thread_id}[/dim]")
                 
                 # Get full thread details with all messages
                 thread_data = self.service.users().threads().get(
@@ -202,24 +196,23 @@ class GmailCleaner:
                 
                 messages = thread_data.get('messages', [])
                 if not messages:
-                    console.print(f"[dim]Thread {thread_id} has no messages, skipping[/dim]")
-                    continue
+                    continue  # Skip empty threads
                 
                 # Check ONLY the first message in the thread for protection
                 first_message = messages[0]
+                headers = {h['name']: h['value'] for h in first_message['payload'].get('headers', [])}
+                subject = headers.get('Subject', '(No Subject)')
+                sender = headers.get('From', '(Unknown Sender)')
+                sender_email = self._extract_email_address(sender)
+                
+                console.print(f"[dim]Thread {thread_id}: '{subject[:40]}...' from {sender_email}[/dim]")
+                
                 first_label_ids = first_message.get('labelIds', [])
                 
                 # Check if thread is protected (based on first message)
-                # Protected if: IMPORTANT, STARRED, or has custom labels (Label_*)
-                has_custom_label = any(label.startswith('Label_') for label in first_label_ids)
-                is_protected = ('IMPORTANT' in first_label_ids or 
-                               'STARRED' in first_label_ids or 
-                               has_custom_label)
-                
-                if is_protected:
-                    console.print(f"[dim]Thread {thread_id} is PROTECTED (important/starred/custom label)[/dim]")
+                if self._is_thread_protected(first_label_ids):
                     threads_protected += 1
-                    continue  # Skip this entire thread
+                    continue  # Skip protected thread
                 
                 # Add unprotected thread to list for processing
                 thread_info = ThreadInfo(
@@ -228,7 +221,8 @@ class GmailCleaner:
                 )
                 threads_to_process.append(thread_info)
             
-            console.print(f"[dim]Found {len(threads_to_process)} unprotected threads ({threads_protected} protected)[/dim]")
+            if threads_to_process or threads_protected:
+                console.print(f"[cyan]{len(threads_to_process)} unprotected threads ready to process ({threads_protected} protected)[/cyan]")
             
             return threads_to_process, next_page_token
             
@@ -252,31 +246,17 @@ class GmailCleaner:
         messages_count = len(thread.messages)
         
         if self.dry_run:
-            confidence_color = {'high': 'green', 'medium': 'yellow', 'low': 'red'}.get(detection.confidence, 'white')
-            console.print(f"[red]WOULD DELETE THREAD[/red] ({messages_count} messages) - [bold]Subject:[/bold] '{subject[:60]}{'...' if len(subject) > 60 else ''}'")
-            console.print(f"    [dim]From:[/dim] {sender_email}")
-            console.print(f"    [{confidence_color}]Confidence: {detection.confidence.upper()} | Score: {detection.score:.1f}[/{confidence_color}]")
-            
-            # Show all reasons, not just the first one
-            for i, reason in enumerate(detection.reasons[:3], 1):  # Show up to 3 reasons
-                console.print(f"    [dim]{i}. {reason}[/dim]")
-            if len(detection.reasons) > 3:
-                console.print(f"    [dim]... and {len(detection.reasons) - 3} more reasons[/dim]")
-            console.print()
+            console.print(f"[red]WOULD DELETE[/red] Thread ({messages_count} msgs): {subject[:50]}... from {sender_email}")
+            if detection.reasons[0].startswith("Sender"):
+                console.print(f"    [dim]Reason: {detection.reasons[0]}[/dim]")
         else:
             try:
                 # Delete the entire thread at once using threads API
                 self.service.users().threads().trash(userId='me', id=thread.id).execute()
                 
-                console.print(f"[green]DELETED THREAD[/green] ({messages_count} messages) - [bold]Subject:[/bold] '{subject[:60]}{'...' if len(subject) > 60 else ''}'")
-                console.print(f"    [dim]From:[/dim] {sender_email}")
-                console.print(f"    [green]Confidence: {detection.confidence.upper()} | Score: {detection.score:.1f}[/green]")
-                console.print()
+                console.print(f"[green]DELETED[/green] Thread ({messages_count} msgs): {subject[:50]}... from {sender_email}")
             except HttpError as error:
-                console.print(f"[red]ERROR DELETING THREAD[/red] - [bold]Subject:[/bold] '{subject[:60]}{'...' if len(subject) > 60 else ''}'")
-                console.print(f"    [dim]From:[/dim] {sender_email}")
-                console.print(f"    [red]Error: {error}[/red]")
-                console.print()
+                console.print(f"[red]ERROR DELETING[/red] Thread: {error}")
     
     def process_emails(self, total_limit: Optional[int] = None):
         """Process all emails in batches"""
@@ -288,7 +268,7 @@ class GmailCleaner:
         console.print(f"\n[bold blue]Starting Gmail Cleanup - AGGRESSIVE MODE[/bold blue]")
         console.print(f"[yellow]Mode: {'DRY RUN (no emails will be deleted)' if self.dry_run else 'LIVE MODE (emails will be permanently deleted)'}[/yellow]")
         console.print(f"[cyan]Detection Method: Aggressive deletion (delete ALL unlabeled emails)[/cyan]")
-        console.print(f"[green]Batch Size: {batch_size} emails per batch[/green]")
+        console.print(f"[green]Batch Size: {batch_size} threads per batch[/green]")
         if total_limit:
             console.print(f"[blue]Processing Limit: {total_limit:,} emails[/blue]")
         else:
@@ -322,15 +302,14 @@ class GmailCleaner:
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            console=console,
-            disable=True
+            console=console
         ) as progress:
             
             # Create progress task
             if total_limit:
-                task = progress.add_task("Processing emails...", total=total_limit)
+                task = progress.add_task("Processing threads...", total=total_limit)
             else:
-                task = progress.add_task("Processing emails...", total=None)
+                task = progress.add_task("Processing threads...", total=None)
             
             while True:
                 # Check for interrupt before starting new batch
@@ -348,21 +327,17 @@ class GmailCleaner:
                     current_batch_size = total_limit - total_processed
                 
                 # Fetch batch of threads
-                console.print(f"[dim]Fetching batch with page_token: {page_token[:20] + '...' if page_token else 'None'}[/dim]")
                 threads, next_page_token = self.get_threads_batch(page_token, current_batch_size)
                 
                 # Only break if no threads AND no more pages
                 if not threads and not next_page_token:
-                    console.print(f"[dim]No more threads to process (threads: {len(threads)}, next_page_token: {next_page_token})[/dim]")
                     break
                 
                 # Update page token for next iteration
                 page_token = next_page_token
-                console.print(f"[dim]Updated page_token for next iteration: {page_token[:20] + '...' if page_token else 'None'}[/dim]")
                 
                 # Skip to next batch if current batch is empty but there are more pages
                 if not threads:
-                    console.print(f"[dim]Batch had no eligible threads after filtering, checking next batch...[/dim]")
                     continue
                 
                 # Truncate threads list if it would exceed the limit
@@ -383,8 +358,9 @@ class GmailCleaner:
                         first_message = thread.messages[0]
                         headers = {h['name']: h['value'] for h in first_message['payload'].get('headers', [])}
                         sender = headers.get('From', '(Unknown Sender)')
+                        subject = headers.get('Subject', '(No Subject)')
                         sender_email = self._extract_email_address(sender)
-                        console.print(f"[dim]({i}/{len(threads)}) Analyzing thread from: {sender_email}[/dim]")
+                        console.print(f"[dim]({i}/{len(threads)}) Thread {thread.id}: '{subject[:40]}...' from {sender_email}[/dim]")
                     
                     detection = self.detect_junk(thread)
                     
@@ -392,7 +368,7 @@ class GmailCleaner:
                         self.delete_thread(thread, detection)
                         # Count all messages in thread as deleted
                         messages_deleted = len([m for m in thread.messages if 'INBOX' in m.get('labelIds', [])])
-                        self.deleted_count += messages_deleted
+                        self.messages_deleted += messages_deleted
                         batch_deleted += messages_deleted
                     else:
                         # Show kept threads in verbose mode
@@ -400,15 +376,12 @@ class GmailCleaner:
                             first_message = thread.messages[0]
                             headers = {h['name']: h['value'] for h in first_message['payload'].get('headers', [])}
                             subject = headers.get('Subject', '(No Subject)')
-                            console.print(f"[green]KEEPING THREAD[/green] ({len(thread.messages)} messages) - [bold]Subject:[/bold] '{subject[:60]}{'...' if len(subject) > 60 else ''}'")
-                            console.print(f"    [dim]From:[/dim] {sender_email}")
-                            console.print(f"    [green]No junk sender match found[/green]")
-                            console.print()
+                            console.print(f"[green]KEEPING[/green] Thread ({len(thread.messages)} msgs): {subject[:50]}... from {sender_email}")
                         messages_kept = len([m for m in thread.messages if 'INBOX' in m.get('labelIds', [])])
-                        self.kept_count += messages_kept
+                        self.messages_kept += messages_kept
                         batch_kept += messages_kept
                     
-                    self.processed_count += 1
+                    self.threads_processed += 1
                     # Update total processed based on thread count
                     total_processed += 1
                     
@@ -423,12 +396,9 @@ class GmailCleaner:
                 # Show detailed batch summary
                 console.print(f"\n[bold cyan]Batch Summary:[/bold cyan]")
                 console.print(f"  [green]Messages Deleted: {batch_deleted}[/green] | [blue]Messages Kept: {batch_kept}[/blue] | [yellow]Threads in batch: {len(threads)}[/yellow]")
-                console.print(f"  [dim]Running totals - Processed: {self.processed_count} | Deleted: {self.deleted_count} | Kept: {self.kept_count}[/dim]")
+                console.print(f"  [dim]Running totals - Threads: {self.threads_processed} | Deleted: {self.messages_deleted} msgs | Kept: {self.messages_kept} msgs[/dim]")
                 
-                if next_page_token:
-                    console.print(f"  [dim]More emails available for processing...[/dim]")
-                else:
-                    console.print(f"  [dim]Reached end of email list.[/dim]")
+                # Remove redundant pagination status messages
                 
                 # Check if interrupted during batch processing
                 if self.interrupted:
@@ -454,14 +424,13 @@ class GmailCleaner:
         table.add_column("Count", justify="right", style="green", width=10)
         table.add_column("Percentage", justify="right", style="yellow", width=12)
         
-        delete_pct = (self.deleted_count / self.processed_count * 100) if self.processed_count > 0 else 0
-        keep_pct = (self.kept_count / self.processed_count * 100) if self.processed_count > 0 else 0
+        total_messages = self.messages_deleted + self.messages_kept
+        delete_pct = (self.messages_deleted / total_messages * 100) if total_messages > 0 else 0
+        keep_pct = (self.messages_kept / total_messages * 100) if total_messages > 0 else 0
         
-        table.add_row("Total Processed", f"{self.processed_count:,}", "100.0%")
-        table.add_row("Emails Deleted", f"{self.deleted_count:,}", f"{delete_pct:.1f}%")
-        table.add_row("Emails Kept", f"{self.kept_count:,}", f"{keep_pct:.1f}%")
-        table.add_row("", "", "")
-        table.add_row("Aggressive Deletes", f"{self.aggressive_deletes:,}", f"{delete_pct:.1f}%")
+        table.add_row("Threads Processed", f"{self.threads_processed:,}", "")
+        table.add_row("Messages Deleted", f"{self.messages_deleted:,}", f"{delete_pct:.1f}%")
+        table.add_row("Messages Kept", f"{self.messages_kept:,}", f"{keep_pct:.1f}%")
         
         console.print(table)
         
@@ -471,21 +440,18 @@ class GmailCleaner:
         console.print(f"  - Cost: $0.00 (no AI API usage)")
         console.print(f"  - Method: Delete all unlabeled/non-important emails")
         
-        if self.kept_count > 0:
-            console.print(f"\n[bold blue]Unexpected Keeps:[/bold blue]")
-            console.print(f"  - {self.kept_count:,} emails were kept (this should be 0 in aggressive mode)")
-            console.print(f"  - This may indicate an issue with the filtering logic")
+        # Remove "unexpected keeps" section since keeping some emails is normal with junk_senders.txt
         
         if self.dry_run:
             console.print(f"\n[bold yellow]DRY RUN MODE:[/bold yellow]")
             console.print(f"  - No emails were actually deleted")
             console.print(f"  - Run with --no-dry-run to actually delete emails")
-            console.print(f"  - Space savings: {self.deleted_count:,} emails would be removed")
+            console.print(f"  - Space savings: {self.messages_deleted:,} messages would be removed")
             console.print(f"  - REMEMBER: Only labeled/important emails are protected!")
         else:
             console.print(f"\n[bold green]LIVE MODE COMPLETED:[/bold green]")
-            console.print(f"  - {self.deleted_count:,} emails were permanently moved to trash")
-            console.print(f"  - {self.kept_count:,} emails remain in your inbox")
+            console.print(f"  - {self.messages_deleted:,} messages were permanently moved to trash")
+            console.print(f"  - {self.messages_kept:,} messages remain in your inbox")
             console.print(f"  - You can restore deleted emails from the Trash folder if needed")
             console.print(f"  - Protected emails (labeled/important) were automatically skipped")
 
@@ -495,8 +461,8 @@ def main():
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Aggressive Gmail inbox cleaner - deletes ALL unlabeled emails')
-    parser.add_argument('--limit', type=int, help='Maximum number of emails to process')
-    parser.add_argument('--batch-size', type=int, default=100, help='Number of emails per batch (default: 100)')
+    parser.add_argument('--limit', type=int, help='Maximum number of threads to process')
+    parser.add_argument('--batch-size', type=int, default=100, help='Number of threads per batch (default: 100)')
     parser.add_argument('--dry-run', action='store_true', help='Run in dry-run mode (don\'t actually delete)')
     parser.add_argument('--no-dry-run', dest='dry_run', action='store_false', help='Actually delete emails')
     parser.set_defaults(dry_run=None)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gmail Cleaner - Pattern-based email cleanup without AI
+Gmail Cleaner - Automated cleanup of unprotected emails
 """
 import os
 import time
@@ -52,6 +52,7 @@ class GmailCleaner:
         self.dry_run = dry_run
         self.service = self._authenticate_gmail()
         self.threads_processed = 0
+        self.threads_deleted = 0
         self.messages_deleted = 0
         self.messages_kept = 0
         self.interrupted = False
@@ -133,7 +134,7 @@ class GmailCleaner:
     
     
     def detect_junk(self, thread: ThreadInfo) -> JunkDetectionResult:
-        """Enhanced aggressive mode: Check junk senders first, then delete everything else"""
+        """Determine if thread should be deleted based on junk sender patterns"""
         # Check the first message's sender against junk patterns
         if thread.messages:
             first_message = thread.messages[0]
@@ -141,7 +142,7 @@ class GmailCleaner:
             sender = headers.get('From', '(Unknown Sender)')
             sender_email = self._extract_email_address(sender)
             
-            # First check: sender pattern match from junk_senders.txt
+            # Check if sender matches any junk pattern
             for junk_pattern in self.junk_senders:
                 if junk_pattern in sender_email:
                     return JunkDetectionResult(
@@ -151,11 +152,11 @@ class GmailCleaner:
                         confidence='high'
                     )
         
-        # AGGRESSIVE MODE: Delete everything else since threads are pre-filtered
+        # Keep threads that don't match junk patterns
         return JunkDetectionResult(
-            is_junk=True,
-            score=100,
-            reasons=["Aggressive mode: No custom labels, importance, or stars"],
+            is_junk=False,
+            score=0,
+            reasons=["Sender not in junk list"],
             confidence='high'
         )
     
@@ -265,17 +266,17 @@ class GmailCleaner:
         total_processed = 0
         
         # Show detailed startup information
-        console.print(f"\n[bold blue]Starting Gmail Cleanup - AGGRESSIVE MODE[/bold blue]")
+        console.print(f"\n[bold blue]Starting Gmail Cleanup[/bold blue]")
         console.print(f"[yellow]Mode: {'DRY RUN (no emails will be deleted)' if self.dry_run else 'LIVE MODE (emails will be permanently deleted)'}[/yellow]")
-        console.print(f"[cyan]Detection Method: Aggressive deletion (delete ALL unlabeled emails)[/cyan]")
+        console.print(f"[cyan]Detection Method: Pattern-based junk detection[/cyan]")  
         console.print(f"[green]Batch Size: {batch_size} threads per batch[/green]")
         if total_limit:
             console.print(f"[blue]Processing Limit: {total_limit:,} emails[/blue]")
         else:
             console.print(f"[blue]Processing Limit: All available emails[/blue]")
         
-        console.print(f"\n[bold red]WARNING - AGGRESSIVE DELETION MODE:[/bold red]")
-        console.print(f"[red]This script will DELETE ALL EMAILS except those that are:[/red]")
+        console.print(f"\n[bold red]WARNING:[/bold red]")
+        console.print(f"[red]This script will DELETE emails except those that are:[/red]")
         console.print(f"  - Marked as IMPORTANT")
         console.print(f"  - STARRED")
         console.print(f"  - Have CUSTOM LABELS applied")
@@ -366,7 +367,8 @@ class GmailCleaner:
                     
                     if detection.is_junk:
                         self.delete_thread(thread, detection)
-                        # Count all messages in thread as deleted
+                        # Count threads and messages deleted
+                        self.threads_deleted += 1
                         messages_deleted = len([m for m in thread.messages if 'INBOX' in m.get('labelIds', [])])
                         self.messages_deleted += messages_deleted
                         batch_deleted += messages_deleted
@@ -416,31 +418,26 @@ class GmailCleaner:
     
     def _print_summary(self):
         """Print final summary table"""
-        console.print(f"\n[bold green]Aggressive Cleanup Complete![/bold green]")
+        console.print(f"\n[bold green]Gmail Cleanup Complete![/bold green]")
         
         # Main statistics table
-        table = Table(title="Gmail Aggressive Cleanup Results", show_header=True, header_style="bold cyan")
+        table = Table(title="Gmail Cleanup Results", show_header=True, header_style="bold cyan")
         table.add_column("Metric", style="cyan", width=25)
         table.add_column("Count", justify="right", style="green", width=10)
-        table.add_column("Percentage", justify="right", style="yellow", width=12)
         
-        total_messages = self.messages_deleted + self.messages_kept
-        delete_pct = (self.messages_deleted / total_messages * 100) if total_messages > 0 else 0
-        keep_pct = (self.messages_kept / total_messages * 100) if total_messages > 0 else 0
+        table.add_row("Threads Processed", f"{self.threads_processed:,}")
+        table.add_row("Threads Deleted", f"{self.threads_deleted:,}")
+        table.add_row("Messages Deleted", f"{self.messages_deleted:,}")
         
-        table.add_row("Threads Processed", f"{self.threads_processed:,}", "")
-        table.add_row("Messages Deleted", f"{self.messages_deleted:,}", f"{delete_pct:.1f}%")
-        table.add_row("Messages Kept", f"{self.messages_kept:,}", f"{keep_pct:.1f}%")
+        # Show kept messages if any
+        if self.messages_kept > 0:
+            table.add_row("Messages Kept", f"{self.messages_kept:,}")
         
         console.print(table)
         
         # Performance metrics
-        console.print(f"\n[bold cyan]Performance Metrics:[/bold cyan]")
-        console.print(f"  - Detection Speed: Instant (aggressive mode)")
-        console.print(f"  - Cost: $0.00 (no AI API usage)")
-        console.print(f"  - Method: Delete all unlabeled/non-important emails")
-        
-        # Remove "unexpected keeps" section since keeping some emails is normal with junk_senders.txt
+        console.print(f"\n[bold cyan]Summary:[/bold cyan]")
+        console.print(f"  - Method: Pattern-based detection using junk_senders.txt")
         
         if self.dry_run:
             console.print(f"\n[bold yellow]DRY RUN MODE:[/bold yellow]")
@@ -460,7 +457,7 @@ def main():
     """Main entry point"""
 
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Aggressive Gmail inbox cleaner - deletes ALL unlabeled emails')
+    parser = argparse.ArgumentParser(description='Gmail inbox cleaner - deletes unprotected emails based on patterns')
     parser.add_argument('--limit', type=int, help='Maximum number of threads to process')
     parser.add_argument('--batch-size', type=int, default=100, help='Number of threads per batch (default: 100)')
     parser.add_argument('--dry-run', action='store_true', help='Run in dry-run mode (don\'t actually delete)')

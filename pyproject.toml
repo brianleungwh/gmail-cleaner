@@ -1,20 +1,28 @@
-[tool.poetry]
+[tool.pyright]
+exclude = [
+  ".venv"
+]
+venvPath = "."
+venv = ".venv"
+reportUnusedCallResult = false
+reportUnknownMemberType = false
+
+[project]
 name = "gmail-cleaner"
 version = "0.1.0"
-description = ""
-authors = ["Your Name <you@example.com>"]
-
-[tool.poetry.dependencies]
-python = "^3.10"
-google-api-python-client = "^2.33.0"
-google-auth-httplib2 = "^0.1.0"
-google-auth-oauthlib = "^0.4.6"
-case-converter = "^1.0.2"
-
-
-[tool.poetry.dev-dependencies]
-pytest = "^5.2"
+description = "Pattern-based Gmail inbox cleaner (no AI required)"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "google-auth>=2.29.0",
+    "google-auth-oauthlib>=1.2.0",
+    "google-auth-httplib2>=0.2.0",
+    "google-api-python-client>=2.127.0",
+    "python-dotenv>=1.0.1",
+    "rich>=13.7.1",
+    "ipdb>=0.13.13",
+]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

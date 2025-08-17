@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail Cleaner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Gmail Cleaner</h1>
+            <p class="text-gray-600">Clean your Gmail inbox by reviewing and selecting domains to delete</p>
+        </div>
+
+        <!-- Status Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-xl font-semibold text-gray-800 mb-2">Authentication Status</h2>
+                    <p id="auth-status" class="text-gray-600">Not connected to Gmail</p>
+                </div>
+                <button id="auth-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                    Connect Gmail
+                </button>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex flex-wrap gap-4">
+                <button id="collect-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                    Scan Inbox
+                </button>
+                <button id="preview-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                    Preview Cleanup
+                </button>
+                <button id="cleanup-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                    Execute Cleanup
+                </button>
+            </div>
+        </div>
+
+        <!-- Progress Section -->
+        <div id="progress-section" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Progress</h3>
+            <div class="bg-gray-200 rounded-full h-2 mb-4">
+                <div id="progress-bar" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <div id="progress-text" class="text-sm text-gray-600 mb-4">Waiting...</div>
+            
+            <!-- Live Log -->
+            <div class="bg-gray-100 rounded p-4 h-32 overflow-y-auto">
+                <div id="log-container" class="space-y-1">
+                    <div class="text-sm text-gray-500">Log messages will appear here...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search and Controls -->
+        <div id="domains-section" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4 md:mb-0">Review Domains</h3>
+                <div class="flex flex-col md:flex-row gap-4">
+                    <!-- Search Box -->
+                    <div class="relative">
+                        <input 
+                            id="search-input" 
+                            type="text" 
+                            placeholder="Search domains and subjects..." 
+                            class="w-full md:w-80 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                        <div id="search-results-count" class="text-sm text-gray-500 mt-1">Showing all domains</div>
+                    </div>
+                    
+                    <!-- Select Controls -->
+                    <div class="flex gap-2">
+                        <button id="select-all-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
+                            Select All
+                        </button>
+                        <button id="deselect-all-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
+                            Deselect All
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Domain List -->
+            <div id="domains-list" class="space-y-2">
+                <!-- Domains will be populated here -->
+            </div>
+
+            <!-- Summary -->
+            <div id="selection-summary" class="mt-6 p-4 bg-blue-50 rounded-lg">
+                <div class="text-sm font-medium text-blue-800">
+                    <span id="selected-count">0</span> domains selected for deletion
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-section" class="bg-white rounded-lg shadow-md p-6 hidden">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Cleanup Results</h3>
+            <div id="results-content" class="space-y-2">
+                <!-- Results will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

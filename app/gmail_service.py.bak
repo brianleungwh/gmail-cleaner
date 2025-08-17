@@ -1,0 +1,344 @@
+"""
+Gmail Service - Core Gmail functionality as a reusable service
+"""
+import json
+import re
+from pathlib import Path
+from typing import List, Dict, Optional, Set, Any, Callable
+from collections import defaultdict
+from dataclasses import dataclass, asdict
+
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
+SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
+
+
+@dataclass
+class ThreadInfo:
+    """Thread information for processing"""
+    id: str
+    messages: List[Dict]
+
+
+@dataclass
+class DomainInfo:
+    """Domain information with statistics"""
+    domain: str
+    count: int
+    sample_subjects: List[str]
+    
+    def to_dict(self):
+        return asdict(self)
+
+
+class GmailService:
+    """Service class for Gmail operations"""
+    
+    def __init__(self, credentials_path: str = 'credentials.json', 
+                 token_path: str = 'token.json',
+                 progress_callback: Optional[Callable] = None):
+        """
+        Initialize Gmail service
+        
+        Args:
+            credentials_path: Path to OAuth credentials file
+            token_path: Path to store/load token
+            progress_callback: Callback function for progress updates
+        """
+        self.credentials_path = credentials_path
+        self.token_path = token_path
+        self.progress_callback = progress_callback
+        self.service = None
+        self.creds = None
+        
+    def authenticate(self, port: int = 0) -> bool:
+        """
+        Authenticate with Gmail API
+        
+        Args:
+            port: Port for OAuth callback (0 for random)
+            
+        Returns:
+            True if authentication successful
+        """
+        try:
+            token_file = Path(self.token_path)
+            
+            # Load existing token
+            if token_file.exists():
+                self.creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
+            
+            # Refresh or get new token
+            if not self.creds or not self.creds.valid:
+                if self.creds and self.creds.expired and self.creds.refresh_token:
+                    self.creds.refresh(Request())
+                else:
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        self.credentials_path, SCOPES)
+                    self.creds = flow.run_local_server(port=port)
+                
+                # Save credentials
+                token_file.write_text(self.creds.to_json())
+            
+            self.service = build('gmail', 'v1', credentials=self.creds)
+            return True
+            
+        except Exception as e:
+            if self.progress_callback:
+                self.progress_callback({
+                    'type': 'error',
+                    'message': f'Authentication failed: {str(e)}'
+                })
+            return False
+    
+    def is_authenticated(self) -> bool:
+        """Check if service is authenticated"""
+        return self.service is not None
+    
+    def _extract_email_address(self, sender: str) -> str:
+        """Extract email address from sender string"""
+        match = re.search(r'<([^>]+)>', sender)
+        if match:
+            return match.group(1).lower()
+        return sender.strip().lower()
+    
+    def _extract_domain(self, email: str) -> str:
+        """Extract domain from email address"""
+        if '@' in email:
+            return email.split('@')[1].lower()
+        return ''
+    
+    def _is_thread_protected(self, label_ids: List[str]) -> bool:
+        """Check if thread is protected from deletion"""
+        # Check for important or starred
+        if 'IMPORTANT' in label_ids or 'STARRED' in label_ids:
+            return True
+        
+        # Check for custom user labels (Label_*)
+        has_custom_label = any(label.startswith('Label_') for label in label_ids)
+        return has_custom_label
+    
+    async def collect_domains(self) -> Dict[str, DomainInfo]:
+        """
+        Collect all unique sender domains from inbox
+        
+        Returns:
+            Dictionary of domain -> DomainInfo
+        """
+        if not self.service:
+            raise ValueError("Service not authenticated")
+        
+        domain_data = defaultdict(lambda: {'count': 0, 'subjects': []})
+        page_token = None
+        total_threads = 0
+        
+        try:
+            while True:
+                # Get threads from inbox
+                results = self.service.users().threads().list(
+                    userId='me',
+                    maxResults=100,
+                    pageToken=page_token,
+                    q='in:inbox'
+                ).execute()
+                
+                threads = results.get('threads', [])
+                next_page_token = results.get('nextPageToken')
+                
+                if not threads:
+                    break
+                
+                for thread in threads:
+                    thread_id = thread['id']
+                    
+                    # Get thread details
+                    thread_data = self.service.users().threads().get(
+                        userId='me',
+                        id=thread_id,
+                        format='metadata',
+                        metadataHeaders=['From', 'Subject']
+                    ).execute()
+                    
+                    messages = thread_data.get('messages', [])
+                    if not messages:
+                        continue
+                    
+                    # Get first message info
+                    first_message = messages[0]
+                    headers = {h['name']: h['value'] 
+                              for h in first_message['payload'].get('headers', [])}
+                    
+                    sender = headers.get('From', '(Unknown Sender)')
+                    subject = headers.get('Subject', '(No Subject)')
+                    sender_email = self._extract_email_address(sender)
+                    domain = self._extract_domain(sender_email)
+                    
+                    if not domain:
+                        continue
+                    
+                    # Store domain data
+                    domain_data[domain]['count'] += 1
+                    
+                    # Keep only first 3 unique subjects
+                    if (subject not in domain_data[domain]['subjects'] and 
+                        len(domain_data[domain]['subjects']) < 3):
+                        # Truncate long subjects
+                        if len(subject) > 60:
+                            subject = subject[:57] + "..."
+                        domain_data[domain]['subjects'].append(subject)
+                    
+                    total_threads += 1
+                    
+                    # Send progress update
+                    if self.progress_callback:
+                        await self.progress_callback({
+                            'type': 'progress',
+                            'threads_scanned': total_threads,
+                            'domains_found': len(domain_data),
+                            'current_thread': f"{sender_email}: {subject[:40]}..."
+                        })
+                
+                page_token = next_page_token
+                if not page_token:
+                    break
+                    
+        except HttpError as error:
+            if self.progress_callback:
+                await self.progress_callback({
+                    'type': 'error',
+                    'message': f'Error fetching threads: {error}'
+                })
+            raise
+        
+        # Convert to DomainInfo objects
+        result = {}
+        for domain, data in domain_data.items():
+            result[domain] = DomainInfo(
+                domain=domain,
+                count=data['count'],
+                sample_subjects=data['subjects']
+            )
+        
+        return result
+    
+    async def cleanup_emails(self, domains_to_delete: Set[str], 
+                           dry_run: bool = True,
+                           limit: Optional[int] = None) -> Dict[str, int]:
+        """
+        Delete emails from specified domains
+        
+        Args:
+            domains_to_delete: Set of domains to delete
+            dry_run: If True, don't actually delete
+            limit: Maximum threads to process
+            
+        Returns:
+            Statistics dictionary
+        """
+        if not self.service:
+            raise ValueError("Service not authenticated")
+        
+        stats = {
+            'threads_processed': 0,
+            'threads_deleted': 0,
+            'messages_deleted': 0,
+            'threads_protected': 0
+        }
+        
+        page_token = None
+        
+        try:
+            while True:
+                # Check limit
+                if limit and stats['threads_processed'] >= limit:
+                    break
+                
+                # Get threads
+                results = self.service.users().threads().list(
+                    userId='me',
+                    maxResults=min(100, limit - stats['threads_processed'] 
+                                  if limit else 100),
+                    pageToken=page_token,
+                    q='in:inbox'
+                ).execute()
+                
+                threads = results.get('threads', [])
+                next_page_token = results.get('nextPageToken')
+                
+                if not threads:
+                    break
+                
+                for thread in threads:
+                    thread_id = thread['id']
+                    
+                    # Get thread details
+                    thread_data = self.service.users().threads().get(
+                        userId='me',
+                        id=thread_id,
+                        format='metadata',
+                        metadataHeaders=['From', 'Subject']
+                    ).execute()
+                    
+                    messages = thread_data.get('messages', [])
+                    if not messages:
+                        continue
+                    
+                    # Check if protected
+                    first_message = messages[0]
+                    first_label_ids = first_message.get('labelIds', [])
+                    
+                    if self._is_thread_protected(first_label_ids):
+                        stats['threads_protected'] += 1
+                        continue
+                    
+                    # Check if should delete
+                    headers = {h['name']: h['value'] 
+                              for h in first_message['payload'].get('headers', [])}
+                    sender = headers.get('From', '(Unknown Sender)')
+                    subject = headers.get('Subject', '(No Subject)')
+                    sender_email = self._extract_email_address(sender)
+                    domain = self._extract_domain(sender_email)
+                    
+                    if domain in domains_to_delete:
+                        if not dry_run:
+                            # Actually delete
+                            self.service.users().threads().trash(
+                                userId='me', id=thread_id).execute()
+                        
+                        stats['threads_deleted'] += 1
+                        stats['messages_deleted'] += len(messages)
+                        
+                        # Progress update
+                        if self.progress_callback:
+                            await self.progress_callback({
+                                'type': 'deleted',
+                                'thread_id': thread_id,
+                                'domain': domain,
+                                'subject': subject[:60],
+                                'message_count': len(messages),
+                                'dry_run': dry_run
+                            })
+                    
+                    stats['threads_processed'] += 1
+                    
+                    # Check limit
+                    if limit and stats['threads_processed'] >= limit:
+                        break
+                
+                page_token = next_page_token
+                if not page_token:
+                    break
+                    
+        except HttpError as error:
+            if self.progress_callback:
+                await self.progress_callback({
+                    'type': 'error',
+                    'message': f'Error during cleanup: {error}'
+                })
+            raise
+        
+        return stats

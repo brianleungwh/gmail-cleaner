@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Indeterminate progress bar animation */
+@layer utilities {
+  .indeterminate {
+    background: linear-gradient(90deg,
+      rgba(59, 130, 246, 0.3) 0%,
+      rgba(59, 130, 246, 1) 50%,
+      rgba(59, 130, 246, 0.3) 100%);
+    background-size: 200% 100%;
+    animation: indeterminate 1.5s ease-in-out infinite;
+  }
+
+  @keyframes indeterminate {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+}

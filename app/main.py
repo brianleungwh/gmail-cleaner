@@ -6,22 +6,25 @@ FastAPI server with WebSocket support for real-time updates
 
 import asyncio
 import json
+import os
 import webbrowser
-from typing import Dict, Set
+from typing import Dict, Set, Optional
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from pydantic import BaseModel
 
 from app.gmail_service import GmailService, DomainInfo
 
+print("main.py loaded", flush=True)
 
 app = FastAPI(title="Gmail Cleaner", description="Clean your Gmail inbox with ease")
-
-# Mount static files
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Global state
 gmail_service = GmailService()
@@ -50,6 +53,8 @@ class ConnectionManager:
         for connection in self.active_connections:
             try:
                 await connection.send_text(json.dumps(message))
+                # Force immediate send without buffering
+                await asyncio.sleep(0)
             except:
                 disconnected.add(connection)
         
@@ -72,7 +77,11 @@ async def progress_callback(message_type: str, data: Dict):
 class CleanupRequest(BaseModel):
     domains: list[str]
     dry_run: bool = True
-    limit: int = None
+    limit: Optional[int] = None
+
+
+class CollectRequest(BaseModel):
+    limit: Optional[int] = None
 
 
 class AuthRequest(BaseModel):
@@ -82,7 +91,7 @@ class AuthRequest(BaseModel):
 @app.get("/", response_class=HTMLResponse)
 async def root():
     """Serve the main application page"""
-    return RedirectResponse(url="/static/index.html")
+    return FileResponse("app/static/index.html")
 
 
 @app.get("/health")
@@ -91,35 +100,105 @@ async def health_check():
     return {"status": "healthy"}
 
 
-@app.post("/auth")
-async def authenticate():
-    """Authenticate with Gmail API"""
-    # Set up progress callback
-    gmail_service.set_progress_callback(progress_callback)
+@app.get("/auth/status")
+async def check_auth_status():
+    """Check if already authenticated"""
+    from pathlib import Path
     
-    # Attempt authentication
-    success = gmail_service.authenticate()
+    token_path = Path("data/token.json")
+    creds_path = Path("data/credentials.json")
+    
+    if token_path.exists():
+        # Try to use existing token
+        gmail_service.set_progress_callback(progress_callback)
+        if gmail_service.authenticate():
+            return {
+                "authenticated": True,
+                "credentials_path": str(creds_path.absolute()) if creds_path.exists() else None
+            }
+    
+    return {
+        "authenticated": False,
+        "credentials_path": str(creds_path.absolute()) if creds_path.exists() else None
+    }
+
+
+@app.post("/auth/upload")
+async def upload_credentials(credentials: dict):
+    """Handle uploaded credentials and start OAuth flow"""
+    import json
+    from pathlib import Path
+    
+    try:
+        print(f"Received credentials upload request")
+        
+        # Save credentials temporarily
+        creds_path = Path("data/credentials.json")
+        creds_path.parent.mkdir(parents=True, exist_ok=True)
+        creds_path.write_text(json.dumps(credentials))
+        print(f"Saved credentials to {creds_path.absolute()}")
+        
+        # Create OAuth flow with uploaded credentials
+        redirect_uri = 'http://localhost:8000/oauth/callback'
+        auth_url = gmail_service.create_oauth_flow(redirect_uri)
+        print(f"Generated auth URL: {auth_url[:50]}...")
+        
+        return {
+            "status": "redirect",
+            "auth_url": auth_url,
+            "message": "Redirect to Google OAuth",
+            "credentials_path": str(creds_path.absolute())
+        }
+    except Exception as e:
+        print(f"Error in upload_credentials: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/oauth/callback")
+async def oauth_callback(code: str = None, error: str = None):
+    """Handle OAuth2 callback from Google"""
+    if error:
+        return RedirectResponse(url="/static/index.html?auth_error=" + error)
+    
+    if not code:
+        return RedirectResponse(url="/static/index.html?auth_error=no_code")
+    
+    # Complete OAuth flow
+    gmail_service.set_progress_callback(progress_callback)
+    success = gmail_service.complete_oauth_flow(code)
     
     if success:
-        return {"status": "authenticated", "message": "Successfully connected to Gmail"}
+        # Redirect to main page with success
+        return RedirectResponse(url="/static/index.html?auth_success=true")
     else:
-        raise HTTPException(status_code=400, detail="Authentication failed")
+        return RedirectResponse(url="/static/index.html?auth_error=oauth_failed")
 
 
 @app.post("/collect")
-async def collect_domains():
+async def collect_domains(request: CollectRequest):
     """Start domain collection process"""
     global collected_domains
-    
+
+    print(f"Collect endpoint called with limit: {request.limit}")
+
     if not gmail_service.service:
+        print("Not authenticated")
         raise HTTPException(status_code=400, detail="Not authenticated. Please authenticate first.")
-    
+
     try:
+        print(f"Starting domain collection with limit: {request.limit}...")
         # Set up progress callback
-        gmail_service.set_progress_callback(progress_callback)
+        # Create a wrapper to ensure compatibility
+        async def async_progress_callback(msg_type: str, data: Dict):
+            print(f"Progress callback: {msg_type} - {data}")
+            await manager.broadcast(msg_type, data)
+
+        gmail_service.set_progress_callback(async_progress_callback)
+
+        # Start collection with limit
+        collected_domains = await gmail_service.collect_domains(limit=request.limit)
         
-        # Start collection
-        collected_domains = await gmail_service.collect_domains()
+        print(f"Collection completed. Found {len(collected_domains)} domains")
         
         # Sort domains by count (highest first)
         sorted_domains = dict(sorted(
@@ -141,6 +220,9 @@ async def collect_domains():
         }
         
     except Exception as e:
+        print(f"Collection error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Collection failed: {str(e)}")
 
 
@@ -151,8 +233,12 @@ async def cleanup_emails(request: CleanupRequest):
         raise HTTPException(status_code=400, detail="Not authenticated. Please authenticate first.")
     
     try:
-        # Set up progress callback
-        gmail_service.set_progress_callback(progress_callback)
+        # Set up progress callback with async wrapper
+        async def async_progress_callback(msg_type: str, data: Dict):
+            print(f"Progress callback: {msg_type} - {data}")
+            await manager.broadcast(msg_type, data)
+        
+        gmail_service.set_progress_callback(async_progress_callback)
         
         # Convert list to set
         junk_domains = set(request.domains)
@@ -215,26 +301,8 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-if __name__ == "__main__":
-    import uvicorn
-    
-    # Open browser automatically
-    def open_browser():
-        webbrowser.open("http://localhost:8000")
-    
-    # Start server with auto-reload for development
-    print("Starting Gmail Cleaner Web Application...")
-    print("Opening browser at http://localhost:8000")
-    
-    # Delay browser opening slightly to ensure server is ready
-    import threading
-    import time
-    def delayed_open():
-        time.sleep(1)
-        open_browser()
-    
-    browser_thread = threading.Thread(target=delayed_open)
-    browser_thread.daemon = True
-    browser_thread.start()
-    
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+# Mount static files AFTER all API routes to avoid conflicts
+app.mount("/static", StaticFiles(directory="app/static", html=True), name="static")
+
+# To run this application, use:
+# uv run python -m uvicorn app.main:app --reload

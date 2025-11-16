@@ -1,4 +1,24 @@
-# Use Python 3.11 slim image
+# Stage 1: Build frontend
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /frontend
+
+# Copy frontend package files
+COPY frontend/package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy frontend source
+COPY frontend/ ./
+
+# Build frontend with Docker flag (outputs to ./dist)
+ENV DOCKER_BUILD=true
+RUN npm run build && \
+    echo "=== Build complete, checking output ===" && \
+    ls -la ./dist/
+
+# Stage 2: Python application
 FROM python:3.11-slim
 
 # Set working directory
@@ -22,6 +42,15 @@ RUN uv pip install --system -e .
 # Copy application code
 COPY app/ ./app/
 COPY gmail_cleaner.py ./
+
+# Copy built frontend from frontend-builder stage
+# The build outputs to ./dist in Docker builds
+COPY --from=frontend-builder /frontend/dist ./app/static
+
+# Verify static files were copied
+RUN echo "=== Verifying static files ===" && \
+    ls -la ./app/static/ && \
+    ls -la ./app/static/assets/ || echo "No assets directory found"
 
 # Create data directory for credentials
 RUN mkdir -p /app/data

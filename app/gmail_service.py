@@ -8,6 +8,7 @@ import json
 import signal
 import sys
 import re
+import asyncio
 from pathlib import Path
 from typing import List, Dict, Optional, Set, Callable
 from dataclasses import dataclass
@@ -15,7 +16,7 @@ from collections import defaultdict
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import InstalledAppFlow, Flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -54,6 +55,7 @@ class GmailService:
         self.token_path = token_path
         self.service = None
         self.interrupted = False
+        self.flow = None  # OAuth flow instance
         
         # Progress callback for real-time updates
         self.progress_callback: Optional[Callable] = None
@@ -82,6 +84,53 @@ class GmailService:
         if self.progress_callback:
             # For sync methods, we can't await, so we'll just ignore progress
             pass
+    
+    def create_oauth_flow(self, redirect_uri: str = None) -> str:
+        """Create OAuth2 flow and return authorization URL"""
+        import os
+        
+        if not os.path.exists(self.credentials_path):
+            raise Exception("Credentials file not found. Please upload credentials.json first.")
+        
+        # Use credentials file to create flow
+        self.flow = Flow.from_client_secrets_file(
+            self.credentials_path,
+            scopes=SCOPES,
+            redirect_uri=redirect_uri or "http://localhost:8000/oauth/callback"
+        )
+        
+        # Generate authorization URL
+        auth_url, _ = self.flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='consent'
+        )
+        
+        return auth_url
+    
+    def complete_oauth_flow(self, authorization_code: str) -> bool:
+        """Complete OAuth flow with authorization code"""
+        try:
+            if not self.flow:
+                raise Exception("OAuth flow not initialized. Call create_oauth_flow first.")
+            
+            # Exchange authorization code for credentials
+            self.flow.fetch_token(code=authorization_code)
+            
+            # Save credentials
+            creds = self.flow.credentials
+            token_path = Path(self.token_path)
+            token_path.parent.mkdir(parents=True, exist_ok=True)
+            token_path.write_text(creds.to_json())
+            
+            # Build service
+            self.service = build('gmail', 'v1', credentials=creds)
+            self._log_progress_sync("authenticated", {"message": "Successfully authenticated with Gmail"})
+            return True
+            
+        except Exception as error:
+            self._log_progress_sync("error", {"message": f"OAuth authentication failed: {error}"})
+            return False
     
     def authenticate(self) -> bool:
         """Authenticate with Gmail API"""
@@ -133,18 +182,54 @@ class GmailService:
         """Check if a thread should be protected from deletion based on its labels"""
         # Check for important or starred
         if 'IMPORTANT' in label_ids or 'STARRED' in label_ids:
+            print(f"DEBUG - Protected by IMPORTANT/STARRED", flush=True)
             return True
-        
+
         # Check for custom user labels
-        has_custom_label = any(label.startswith('Label_') for label in label_ids)
-        return has_custom_label
+        custom_labels = [label for label in label_ids if label.startswith('Label_')]
+        if custom_labels:
+            print(f"DEBUG - Protected by custom labels: {custom_labels}", flush=True)
+            return True
+
+        # Check for other system labels that might indicate user organization
+        # Categories are user-applied in Gmail
+        category_labels = [label for label in label_ids if label.startswith('CATEGORY_')]
+        if category_labels:
+            print(f"DEBUG - Has category labels (not protected): {category_labels}", flush=True)
+
+        return False
     
-    async def collect_domains(self) -> Dict[str, DomainInfo]:
-        """Collect all unique sender domains from inbox"""
+    async def collect_domains(self, limit: Optional[int] = None) -> Dict[str, DomainInfo]:
+        """Collect all unique sender domains from inbox
+
+        Args:
+            limit: Optional limit on number of threads to process
+        """
         if not self.service:
             raise Exception("Not authenticated. Call authenticate() first.")
-        
-        await self._log_progress("collection_started", {"message": "Starting domain collection..."})
+
+        # Get total thread count first for accurate progress
+        try:
+            inbox_info = await asyncio.to_thread(
+                lambda: self.service.users().labels().get(
+                    userId='me',
+                    id='INBOX'
+                ).execute()
+            )
+            total_thread_count = inbox_info.get('threadsTotal', 0)
+        except Exception as e:
+            print(f"Could not get inbox thread count: {e}")
+            total_thread_count = 0
+
+        # If limit is set, use it as the effective total
+        effective_total = min(limit, total_thread_count) if limit else total_thread_count
+
+        message = f"Starting domain collection (limit: {limit} threads)..." if limit else "Starting domain collection..."
+        await self._log_progress("collection_started", {
+            "message": message,
+            "total_threads": effective_total,
+            "limit": limit
+        })
         
         # Dictionary to store domain info: domain -> {count, subjects}
         domain_data = defaultdict(lambda: {'count': 0, 'subjects': []})
@@ -157,12 +242,15 @@ class GmailService:
             
             try:
                 # Get ALL threads from inbox (no filtering)
-                results = self.service.users().threads().list(
-                    userId='me',
-                    maxResults=100,
-                    pageToken=page_token,
-                    q='in:inbox'
-                ).execute()
+                # Run in thread pool to avoid blocking event loop
+                results = await asyncio.to_thread(
+                    lambda: self.service.users().threads().list(
+                        userId='me',
+                        maxResults=100,
+                        pageToken=page_token,
+                        q='in:inbox'
+                    ).execute()
+                )
                 
                 threads = results.get('threads', [])
                 next_page_token = results.get('nextPageToken')
@@ -176,25 +264,39 @@ class GmailService:
                     
                     thread_id = thread['id']
                     
-                    # Get thread details
-                    thread_data = self.service.users().threads().get(
-                        userId='me',
-                        id=thread_id,
-                        format='metadata',
-                        metadataHeaders=['From', 'Subject']
-                    ).execute()
+                    # Get thread details - run in thread pool
+                    thread_data = await asyncio.to_thread(
+                        lambda: self.service.users().threads().get(
+                            userId='me',
+                            id=thread_id,
+                            format='metadata',
+                            metadataHeaders=['From', 'Subject']
+                        ).execute()
+                    )
                     
                     messages = thread_data.get('messages', [])
                     if not messages:
                         continue
-                    
+
                     # Get first message info
                     first_message = messages[0]
                     headers = {h['name']: h['value'] for h in first_message['payload'].get('headers', [])}
                     sender = headers.get('From', '(Unknown Sender)')
                     subject = headers.get('Subject', '(No Subject)')
                     sender_email = self._extract_email_address(sender)
-                    
+
+                    # DEBUG: Check labels during collection
+                    thread_label_ids = thread_data.get('labelIds', [])
+                    first_message_label_ids = first_message.get('labelIds', [])
+                    all_label_ids = list(set(thread_label_ids + first_message_label_ids))
+
+                    print(f"DEBUG COLLECT - Thread {thread_id}: subject='{subject[:40]}', thread_labels={thread_label_ids}, message_labels={first_message_label_ids}, combined={all_label_ids}", flush=True)
+
+                    # Check if protected - skip if so
+                    if self._is_thread_protected(all_label_ids):
+                        print(f"DEBUG COLLECT - SKIPPING PROTECTED thread {thread_id} with labels: {all_label_ids}", flush=True)
+                        continue  # Skip protected threads from domain collection
+
                     # Extract domain from email
                     domain = self._extract_domain(sender_email)
                     if not domain:
@@ -207,15 +309,29 @@ class GmailService:
                         domain_data[domain]['subjects'].append(subject)
                     
                     total_threads += 1
-                    
+
                     # Send progress update
                     await self._log_progress("thread_processed", {
                         "thread_id": thread_id,
                         "domain": domain,
                         "subject": subject[:60] + "..." if len(subject) > 60 else subject,
-                        "total_threads": total_threads,
+                        "processed_threads": total_threads,
+                        "total_threads": effective_total,
                         "unique_domains": len(domain_data)
                     })
+
+                    # Check if we've hit the limit
+                    if limit and total_threads >= limit:
+                        print(f"Reached limit of {limit} threads, stopping collection", flush=True)
+                        break
+
+                    # Yield control to event loop every 10 threads for real-time updates
+                    if total_threads % 10 == 0:
+                        await asyncio.sleep(0)
+
+                # Break outer loop if we hit the limit
+                if limit and total_threads >= limit:
+                    break
                 
                 page_token = next_page_token
                 if not page_token:
@@ -241,10 +357,12 @@ class GmailService:
                 sample_subjects=truncated_subjects
             )
         
+        limit_msg = f" (limited to {limit})" if limit else ""
         await self._log_progress("collection_completed", {
-            "total_threads": total_threads,
+            "processed_threads": total_threads,
+            "total_threads": effective_total,
             "unique_domains": len(result),
-            "message": f"Collection complete: {total_threads:,} threads, {len(result):,} unique domains"
+            "message": f"Collection complete{limit_msg}: {total_threads:,} threads processed, {len(result):,} unique domains"
         })
         
         return result
@@ -253,35 +371,42 @@ class GmailService:
         """Clean up emails based on junk domains list"""
         if not self.service:
             raise Exception("Not authenticated. Call authenticate() first.")
-        
+
         await self._log_progress("cleanup_started", {
             "domains_count": len(junk_domains),
             "dry_run": dry_run,
             "limit": total_limit
         })
-        
+
         page_token = None
         total_processed = 0
         threads_deleted = 0
         messages_deleted = 0
         messages_kept = 0
         batch_size = 100
-        
+
+        # Build Gmail search query to only get threads from selected domains
+        # Format: "from:@domain1.com OR from:@domain2.com OR ..."
+        domain_query_parts = [f"from:@{domain}" for domain in junk_domains]
+        search_query = f"in:inbox ({' OR '.join(domain_query_parts)})"
+
+        print(f"DEBUG - Cleanup search query: {search_query[:200]}...", flush=True)
+
         while True:
             if self.interrupted:
                 break
-            
+
             # Check if we've reached the limit
             if total_limit and total_processed >= total_limit:
                 break
-            
+
             # Adjust batch size if approaching limit
             current_batch_size = batch_size
             if total_limit and (total_processed + batch_size > total_limit):
                 current_batch_size = total_limit - total_processed
-            
-            # Fetch batch of threads
-            threads, next_page_token = await self.get_threads_batch(page_token, current_batch_size)
+
+            # Fetch batch of threads using domain-filtered query
+            threads, next_page_token = await self.get_threads_batch(page_token, current_batch_size, search_query=search_query)
             
             # Only break if no threads AND no more pages
             if not threads and not next_page_token:
@@ -356,18 +481,27 @@ class GmailService:
             confidence='high'
         )
     
-    async def get_threads_batch(self, page_token: Optional[str] = None, batch_size: int = 100) -> tuple[List[ThreadInfo], Optional[str]]:
-        """Fetch a batch of threads and their messages for processing"""
+    async def get_threads_batch(self, page_token: Optional[str] = None, batch_size: int = 100, search_query: Optional[str] = None) -> tuple[List[ThreadInfo], Optional[str]]:
+        """Fetch a batch of threads and their messages for processing
+
+        Args:
+            page_token: Token for pagination
+            batch_size: Number of threads to fetch
+            search_query: Gmail search query (defaults to 'in:inbox' if None)
+        """
         if not self.service:
             raise Exception("Not authenticated. Call authenticate() first.")
-        
+
         try:
-            # Get ALL threads from inbox - we'll do filtering manually
+            # Use provided search query or default to inbox
+            query = search_query if search_query else 'in:inbox'
+
+            # Get threads matching the query
             results = self.service.users().threads().list(
                 userId='me',
                 maxResults=batch_size,
                 pageToken=page_token,
-                q='in:inbox'  # Just get inbox threads
+                q=query
             ).execute()
             
             threads = results.get('threads', [])
@@ -400,12 +534,21 @@ class GmailService:
                 subject = headers.get('Subject', '(No Subject)')
                 sender = headers.get('From', '(Unknown Sender)')
                 sender_email = self._extract_email_address(sender)
-                
-                first_label_ids = first_message.get('labelIds', [])
-                
-                # Check if thread is protected (based on first message)
-                if self._is_thread_protected(first_label_ids):
+
+                # Get labels from both thread and first message
+                thread_label_ids = thread_data.get('labelIds', [])
+                first_message_label_ids = first_message.get('labelIds', [])
+
+                # Combine both sets of labels for checking
+                all_label_ids = list(set(thread_label_ids + first_message_label_ids))
+
+                # DEBUG: Log labels for investigation
+                print(f"DEBUG - Thread {thread_id}: thread_labels={thread_label_ids}, message_labels={first_message_label_ids}, combined={all_label_ids}", flush=True)
+
+                # Check if thread is protected (based on combined labels)
+                if self._is_thread_protected(all_label_ids):
                     threads_protected += 1
+                    print(f"DEBUG - PROTECTED thread {thread_id} with labels: {all_label_ids}", flush=True)
                     continue  # Skip protected thread
                 
                 # Add unprotected thread to list for processing

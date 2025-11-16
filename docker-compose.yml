@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   gmail-cleaner:
     build: .
@@ -8,8 +6,6 @@ services:
     volumes:
       # Mount data directory for credentials persistence
       - ./data:/app/data
-      # Mount app directory for development (uncomment for development)
-      # - ./app:/app/app
     environment:
       - PYTHONPATH=/app
     restart: unless-stopped

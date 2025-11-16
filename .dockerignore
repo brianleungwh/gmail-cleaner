@@ -56,3 +56,8 @@ senders_to_review.txt
 # Development
 *.orig
 *.rej
+
+# Frontend
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/

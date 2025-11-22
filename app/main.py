@@ -8,12 +8,22 @@ import asyncio
 import json
 import os
 import webbrowser
+import logging
 from typing import Dict, Set, Optional
 from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Configure logging
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -22,7 +32,7 @@ from pydantic import BaseModel
 
 from app.gmail_service import GmailService, DomainInfo
 
-print("main.py loaded", flush=True)
+logger.info(f"Starting Gmail Cleaner with log level: {LOG_LEVEL}")
 
 app = FastAPI(title="Gmail Cleaner", description="Clean your Gmail inbox with ease")
 
@@ -130,19 +140,19 @@ async def upload_credentials(credentials: dict):
     from pathlib import Path
     
     try:
-        print(f"Received credentials upload request")
-        
+        logger.info("Received credentials upload request")
+
         # Save credentials temporarily
         creds_path = Path("data/credentials.json")
         creds_path.parent.mkdir(parents=True, exist_ok=True)
         creds_path.write_text(json.dumps(credentials))
-        print(f"Saved credentials to {creds_path.absolute()}")
-        
+        logger.info(f"Saved credentials to {creds_path.absolute()}")
+
         # Create OAuth flow with uploaded credentials
         redirect_uri = 'http://localhost:8000/oauth/callback'
         auth_url = gmail_service.create_oauth_flow(redirect_uri)
-        print(f"Generated auth URL: {auth_url[:50]}...")
-        
+        logger.debug(f"Generated auth URL: {auth_url[:50]}...")
+
         return {
             "status": "redirect",
             "auth_url": auth_url,
@@ -150,7 +160,7 @@ async def upload_credentials(credentials: dict):
             "credentials_path": str(creds_path.absolute())
         }
     except Exception as e:
-        print(f"Error in upload_credentials: {e}")
+        logger.error(f"Error in upload_credentials: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -179,34 +189,34 @@ async def collect_domains(request: CollectRequest):
     """Start domain collection process"""
     global collected_domains
 
-    print(f"Collect endpoint called with limit: {request.limit}")
+    logger.info(f"Collect endpoint called with limit: {request.limit}")
 
     if not gmail_service.service:
-        print("Not authenticated")
+        logger.warning("Not authenticated")
         raise HTTPException(status_code=400, detail="Not authenticated. Please authenticate first.")
 
     try:
-        print(f"Starting domain collection with limit: {request.limit}...")
+        logger.info(f"Starting domain collection with limit: {request.limit}...")
         # Set up progress callback
         # Create a wrapper to ensure compatibility
         async def async_progress_callback(msg_type: str, data: Dict):
-            print(f"Progress callback: {msg_type} - {data}")
+            logger.debug(f"Progress callback: {msg_type} - {data}")
             await manager.broadcast(msg_type, data)
 
         gmail_service.set_progress_callback(async_progress_callback)
 
         # Start collection with limit
         collected_domains = await gmail_service.collect_domains(limit=request.limit)
-        
-        print(f"Collection completed. Found {len(collected_domains)} domains")
-        
+
+        logger.info(f"Collection completed. Found {len(collected_domains)} domains")
+
         # Sort domains by count (highest first)
         sorted_domains = dict(sorted(
-            collected_domains.items(), 
-            key=lambda x: x[1].count, 
+            collected_domains.items(),
+            key=lambda x: x[1].count,
             reverse=True
         ))
-        
+
         return {
             "status": "completed",
             "domains": {
@@ -218,11 +228,9 @@ async def collect_domains(request: CollectRequest):
             },
             "total_domains": len(collected_domains)
         }
-        
+
     except Exception as e:
-        print(f"Collection error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Collection error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Collection failed: {str(e)}")
 
 
@@ -235,9 +243,9 @@ async def cleanup_emails(request: CleanupRequest):
     try:
         # Set up progress callback with async wrapper
         async def async_progress_callback(msg_type: str, data: Dict):
-            print(f"Progress callback: {msg_type} - {data}")
+            logger.debug(f"Progress callback: {msg_type} - {data}")
             await manager.broadcast(msg_type, data)
-        
+
         gmail_service.set_progress_callback(async_progress_callback)
         
         # Convert list to set

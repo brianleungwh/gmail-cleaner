@@ -8,6 +8,9 @@ services:
       - ./data:/app/data
     environment:
       - PYTHONPATH=/app
+      # Set log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+      # Change to DEBUG to see detailed logs including thread processing details
+      - LOG_LEVEL=INFO
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

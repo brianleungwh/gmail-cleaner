@@ -55,6 +55,9 @@ RUN echo "=== Verifying static files ===" && \
 # Create data directory for credentials
 RUN mkdir -p /app/data
 
+# Set default log level (can be overridden in docker-compose or at runtime)
+ENV LOG_LEVEL=INFO
+
 # Expose port
 EXPOSE 8000
 

@@ -12,7 +12,8 @@
     const searchData = Object.entries($domains).map(([domain, info]) => ({
       domain,
       count: info.count,
-      subjects: info.sample_subjects.join(' ')
+      // Search through all thread subjects, not just samples
+      subjects: info.threads?.map(t => t.subject).join(' ') || ''
     }));
 
     fuse = new Fuse(searchData, {

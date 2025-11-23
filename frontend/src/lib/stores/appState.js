@@ -13,6 +13,7 @@ export const totalThreads = writable(0);
 // Cleanup state
 export const isCleaning = writable(false);
 export const selectedDomains = writable(new Set());
+export const expandedDomains = writable(new Set());
 
 // Progress state
 export const progressVisible = writable(false);

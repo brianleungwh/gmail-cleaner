@@ -222,7 +222,7 @@ async def collect_domains(request: CollectRequest):
             "domains": {
                 domain: {
                     "count": info.count,
-                    "sample_subjects": info.sample_subjects
+                    "threads": info.threads
                 }
                 for domain, info in sorted_domains.items()
             },
@@ -285,7 +285,7 @@ async def get_collected_domains():
         "domains": {
             domain: {
                 "count": info.count,
-                "sample_subjects": info.sample_subjects
+                "threads": info.threads
             }
             for domain, info in sorted_domains.items()
         },

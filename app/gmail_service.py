@@ -33,7 +33,7 @@ class DomainInfo:
     """Domain information for collection"""
     domain: str
     count: int
-    sample_subjects: List[str]
+    threads: List[Dict]  # Full thread data: [{thread_id, subject, sender, message_count}, ...]
 
 
 class GmailService:
@@ -356,17 +356,23 @@ class GmailService:
         # Convert to DomainInfo objects
         result = {}
         for domain, data in domain_data.items():
-            # Truncate long subjects
-            truncated_subjects = []
-            for subject in data['subjects']:
-                if len(subject) > 60:
-                    subject = subject[:57] + "..."
-                truncated_subjects.append(subject)
-            
+            # Build full thread list for this domain
+            thread_ids = self.threads_by_domain.get(domain, [])
+            threads = []
+            for thread_id in thread_ids:
+                thread_metadata = self.threads_by_id.get(thread_id)
+                if thread_metadata:
+                    threads.append({
+                        'thread_id': thread_id,
+                        'subject': thread_metadata['subject'],
+                        'sender': thread_metadata['sender'],
+                        'message_count': thread_metadata['message_count']
+                    })
+
             result[domain] = DomainInfo(
                 domain=domain,
                 count=data['count'],
-                sample_subjects=truncated_subjects
+                threads=threads
             )
         
         limit_msg = f" (limited to {limit})" if limit else ""

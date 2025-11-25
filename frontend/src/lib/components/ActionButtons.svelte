@@ -19,7 +19,6 @@
   async function collectDomains() {
     if ($isCollecting) return;
 
-    console.log('Starting domain collection...');
     $isCollecting = true;
     showProgress();
     collectBtnText = 'Scanning...';
@@ -40,7 +39,6 @@
       }
 
       const result = await response.json();
-      console.log('Collection response:', result);
 
       // Data will be handled via WebSocket messages
     } catch (error) {

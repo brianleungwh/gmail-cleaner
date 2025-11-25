@@ -42,7 +42,6 @@
 
   function handleWebSocketMessage(message) {
     const { type, data } = message;
-    console.log('Handling WebSocket message type:', type, 'data:', data);
 
     switch (type) {
       case 'authenticated':
@@ -76,7 +75,7 @@
         handleError(data);
         break;
       default:
-        console.log('Unknown message type:', type, data);
+        console.warn('Unknown WebSocket message type:', type, data);
     }
   }
 

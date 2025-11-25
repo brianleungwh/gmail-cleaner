@@ -1,43 +1,35 @@
 <script>
   import { domainsVisible, domains, selectedDomains, selectedCount } from '../stores/appState';
   import DomainItem from './DomainItem.svelte';
-  import Fuse from 'fuse.js';
 
   let searchQuery = '';
-  let fuse = null;
   let filteredDomains = [];
-
-  // Initialize fuzzy search when domains change
-  $: if (Object.keys($domains).length > 0) {
-    const searchData = Object.entries($domains).map(([domain, info]) => ({
-      domain,
-      count: info.count,
-      // Search through all thread subjects, not just samples
-      subjects: info.threads?.map(t => t.subject).join(' ') || ''
-    }));
-
-    fuse = new Fuse(searchData, {
-      keys: ['domain', 'subjects'],
-      threshold: 0.3,
-      includeScore: true
-    });
-
-    // Update filtered domains when search query or domains change
-    updateFilteredDomains();
-  }
 
   function updateFilteredDomains() {
     if (!searchQuery.trim()) {
       filteredDomains = Object.entries($domains);
-    } else if (fuse) {
-      const results = fuse.search(searchQuery);
-      filteredDomains = results.map(result => [result.item.domain, $domains[result.item.domain]]);
+    } else {
+      const query = searchQuery.toLowerCase();
+
+      filteredDomains = Object.entries($domains).filter(([domain, info]) => {
+        // Search in domain name
+        if (domain.toLowerCase().includes(query)) {
+          return true;
+        }
+
+        // Search in thread subjects
+        const threads = info.threads || [];
+        return threads.some(thread =>
+          thread.subject.toLowerCase().includes(query)
+        );
+      });
     }
   }
 
-  // Update filtered domains when search query changes
+  // Update filtered domains when domains or search query changes
   $: {
-    searchQuery;
+    $domains;  // React to domains changes
+    searchQuery;  // React to search query changes
     updateFilteredDomains();
   }
 

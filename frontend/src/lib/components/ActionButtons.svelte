@@ -104,27 +104,27 @@
   $: cleanupDisabled = !$hasCollectedDomains || !$hasSelection || $isCleaning;
 </script>
 
-<div class="bg-white rounded-lg shadow-md p-6 mb-6">
-  <div class="flex flex-col gap-4">
+<div class="bg-white rounded-2xl shadow-xl shadow-gray-200/50 p-8 border border-gray-100/50 hover:shadow-2xl transition-shadow duration-300">
+  <div class="flex flex-col gap-6">
     <!-- Scan Controls -->
     <div class="flex flex-wrap items-center gap-4">
       <button
         on:click={collectDomains}
         disabled={collectDisabled}
-        class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
+        class="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-purple-500/30 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200 hover:scale-105 active:scale-95"
       >
-        {collectBtnText}
+        🔍 {collectBtnText}
       </button>
 
-      <div class="flex items-center gap-2">
-        <label for="scan-limit" class="text-sm text-gray-600">Limit threads:</label>
+      <div class="flex items-center gap-3">
+        <label for="scan-limit" class="text-sm font-medium text-gray-700">Limit threads:</label>
         <input
           id="scan-limit"
           type="number"
           bind:value={scanLimitInput}
           placeholder="All"
           min="1"
-          class="w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+          class="w-28 px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all"
         />
         <span class="text-xs text-gray-500">(leave empty for all)</span>
       </div>
@@ -135,16 +135,16 @@
       <button
         on:click={previewCleanup}
         disabled={previewDisabled}
-        class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
+        class="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-blue-500/30 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200 hover:scale-105 active:scale-95"
       >
-        Preview Cleanup
+        👁️ Preview Cleanup
       </button>
       <button
         on:click={executeCleanup}
         disabled={cleanupDisabled}
-        class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
+        class="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-orange-500/30 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200 hover:scale-105 active:scale-95"
       >
-        Execute Cleanup
+        🔥 Execute Cleanup
       </button>
     </div>
   </div>

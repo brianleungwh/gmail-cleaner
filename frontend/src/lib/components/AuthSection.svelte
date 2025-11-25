@@ -178,10 +178,10 @@
   });
 </script>
 
-<div class="bg-white rounded-lg shadow-md p-6 mb-6">
-  <div class="flex items-center justify-between mb-4">
+<div class="bg-white rounded-2xl shadow-xl shadow-gray-200/50 p-8 border border-gray-100/50 hover:shadow-2xl transition-shadow duration-300">
+  <div class="flex items-center justify-between mb-6">
     <div class="flex-1">
-      <h2 class="text-xl font-semibold text-gray-800 mb-2">Authentication Status</h2>
+      <h2 class="text-2xl font-bold text-gray-900 mb-2">Authentication Status</h2>
       <p class="text-gray-600" class:text-green-600={$isAuthenticated} class:font-semibold={$isAuthenticated}>
         {$isAuthenticated ? 'Connected to Gmail' : 'Not connected to Gmail'}
       </p>
@@ -214,6 +214,8 @@
   {#if showUploadSection && !$isAuthenticated}
     <div>
       <div
+        role="button"
+        tabindex="0"
         class="border-2 border-dashed rounded-lg p-6 text-center hover:border-blue-400 transition-colors"
         class:border-gray-300={!dropZoneHighlight && !uploadSuccess}
         class:border-blue-400={dropZoneHighlight}

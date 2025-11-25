@@ -57,11 +57,11 @@
 </script>
 
 {#if $domainsVisible}
-  <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+  <div class="bg-white rounded-2xl shadow-xl shadow-gray-200/50 p-8 border border-gray-100/50 hover:shadow-2xl transition-shadow duration-300">
     <!-- Header -->
-    <div class="mb-6">
-      <h3 class="text-xl font-semibold text-gray-800 mb-2">Review Domains</h3>
-      <p class="text-sm text-gray-600">Select domains to delete. Protected emails (starred, important, or labeled) are excluded.</p>
+    <div class="mb-8">
+      <h3 class="text-2xl font-bold text-gray-900 mb-2">Review Domains</h3>
+      <p class="text-gray-600">Select domains to delete. Protected emails (starred, important, or labeled) are excluded.</p>
     </div>
 
     <!-- Controls Bar -->
@@ -71,41 +71,41 @@
         <input
           bind:value={searchQuery}
           type="text"
-          placeholder="Search domains and subjects..."
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          placeholder="🔎 Search domains and subjects..."
+          class="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all shadow-sm"
         >
-        <div class="text-xs text-gray-500 mt-1">{searchResultsText}</div>
+        <div class="text-xs text-gray-500 mt-2">{searchResultsText}</div>
       </div>
 
       <!-- Select Controls -->
-      <div class="flex gap-2 flex-shrink-0">
+      <div class="flex gap-3 flex-shrink-0">
         <button
           on:click={selectAll}
-          class="bg-gray-500 hover:bg-gray-600 text-white text-sm font-medium py-2 px-4 rounded transition-colors"
+          class="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white text-sm font-medium py-2.5 px-5 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
         >
-          Select All
+          ✅ Select All
         </button>
         <button
           on:click={deselectAll}
-          class="bg-gray-500 hover:bg-gray-600 text-white text-sm font-medium py-2 px-4 rounded transition-colors"
+          class="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white text-sm font-medium py-2.5 px-5 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
         >
-          Deselect All
+          ❌ Deselect All
         </button>
       </div>
     </div>
 
     <!-- Table Header -->
-    <div class="bg-gray-50 border-b-2 border-gray-200 px-4 py-3 rounded-t-lg">
+    <div class="bg-gradient-to-r from-purple-50 to-blue-50 border-b-2 border-purple-200 px-6 py-4 rounded-t-xl">
       <div class="flex items-center gap-3">
         <div class="w-5"></div>
-        <div class="flex-1 text-sm font-semibold text-gray-700">Domain</div>
-        <div class="w-24 text-sm font-semibold text-gray-700 text-right">Threads</div>
+        <div class="flex-1 text-sm font-bold text-gray-800">Domain</div>
+        <div class="w-24 text-sm font-bold text-gray-800 text-right">Threads</div>
         <div class="w-10"></div>
       </div>
     </div>
 
     <!-- Domain List -->
-    <div class="border-x border-b border-gray-200 rounded-b-lg">
+    <div class="border-x-2 border-b-2 border-purple-100 rounded-b-xl overflow-hidden">
       {#if filteredDomains.length === 0}
         <div class="p-8 text-center text-gray-500">
           {#if searchQuery.trim()}
@@ -124,13 +124,13 @@
     </div>
 
     <!-- Summary Footer -->
-    <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+    <div class="mt-6 p-5 bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-xl">
       <div class="flex items-center justify-between">
-        <div class="text-sm font-medium text-blue-900">
-          {$selectedCount} {$selectedCount === 1 ? 'domain' : 'domains'} selected for deletion
+        <div class="text-sm font-semibold text-purple-900">
+          ✨ {$selectedCount} {$selectedCount === 1 ? 'domain' : 'domains'} selected for deletion
         </div>
         {#if $selectedCount > 0}
-          <div class="text-xs text-blue-700">
+          <div class="text-xs font-medium text-purple-700">
             Review your selection, then use Preview or Execute below
           </div>
         {/if}

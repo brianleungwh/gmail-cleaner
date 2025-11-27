@@ -57,57 +57,57 @@
 </script>
 
 {#if $domainsVisible}
-  <div class="bg-white rounded-2xl shadow-xl shadow-gray-200/50 p-8 border border-gray-100/50 hover:shadow-2xl transition-shadow duration-300">
+  <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
     <!-- Header -->
-    <div class="mb-8">
-      <h3 class="text-2xl font-bold text-gray-900 mb-2">Review Domains</h3>
-      <p class="text-gray-600">Select domains to delete. Protected emails (starred, important, or labeled) are excluded.</p>
+    <div class="mb-6">
+      <h3 class="text-lg font-semibold text-gray-900 mb-1">Review Domains</h3>
+      <p class="text-sm text-gray-500">Select domains to delete. Protected emails (starred, important, or labeled) are excluded.</p>
     </div>
 
     <!-- Controls Bar -->
-    <div class="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+    <div class="mb-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
       <!-- Search Box -->
       <div class="w-full sm:w-auto sm:flex-1 sm:max-w-md">
         <input
           bind:value={searchQuery}
           type="text"
-          placeholder="🔎 Search domains and subjects..."
-          class="w-full px-5 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all shadow-sm"
+          placeholder="Search domains and subjects..."
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-sm"
         >
-        <div class="text-xs text-gray-500 mt-2">{searchResultsText}</div>
+        <div class="text-xs text-gray-500 mt-1">{searchResultsText}</div>
       </div>
 
       <!-- Select Controls -->
-      <div class="flex gap-3 flex-shrink-0">
+      <div class="flex gap-2 flex-shrink-0">
         <button
           on:click={selectAll}
-          class="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white text-sm font-medium py-2.5 px-5 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
+          class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg transition-colors"
         >
-          ✅ Select All
+          Select All
         </button>
         <button
           on:click={deselectAll}
-          class="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white text-sm font-medium py-2.5 px-5 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
+          class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg transition-colors"
         >
-          ❌ Deselect All
+          Deselect All
         </button>
       </div>
     </div>
 
     <!-- Table Header -->
-    <div class="bg-gradient-to-r from-purple-50 to-blue-50 border-b-2 border-purple-200 px-6 py-4 rounded-t-xl">
+    <div class="bg-gray-50 border-b border-gray-200 px-4 py-3 rounded-t-lg">
       <div class="flex items-center gap-3">
         <div class="w-5"></div>
-        <div class="flex-1 text-sm font-bold text-gray-800">Domain</div>
-        <div class="w-24 text-sm font-bold text-gray-800 text-right">Threads</div>
-        <div class="w-10"></div>
+        <div class="flex-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">Domain</div>
+        <div class="w-20 text-xs font-semibold text-gray-600 uppercase tracking-wide text-right">Threads</div>
+        <div class="w-8"></div>
       </div>
     </div>
 
     <!-- Domain List -->
-    <div class="border-x-2 border-b-2 border-purple-100 rounded-b-xl overflow-hidden">
+    <div class="border border-t-0 border-gray-200 rounded-b-lg overflow-hidden">
       {#if filteredDomains.length === 0}
-        <div class="p-8 text-center text-gray-500">
+        <div class="p-6 text-center text-gray-500 text-sm">
           {#if searchQuery.trim()}
             No domains match your search.
           {:else}
@@ -116,7 +116,7 @@
         </div>
       {:else}
         {#each filteredDomains as [domain, info], index (domain)}
-          <div class:border-t={index > 0} class="border-gray-200">
+          <div class:border-t={index > 0} class="border-gray-100">
             <DomainItem {domain} {info} />
           </div>
         {/each}
@@ -124,14 +124,14 @@
     </div>
 
     <!-- Summary Footer -->
-    <div class="mt-6 p-5 bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-xl">
+    <div class="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
       <div class="flex items-center justify-between">
-        <div class="text-sm font-semibold text-purple-900">
-          ✨ {$selectedCount} {$selectedCount === 1 ? 'domain' : 'domains'} selected for deletion
+        <div class="text-sm font-medium text-gray-700">
+          {$selectedCount} {$selectedCount === 1 ? 'domain' : 'domains'} selected for deletion
         </div>
         {#if $selectedCount > 0}
-          <div class="text-xs font-medium text-purple-700">
-            Review your selection, then use Preview or Execute below
+          <div class="text-xs text-gray-500">
+            Review your selection, then use Preview or Execute above
           </div>
         {/if}
       </div>

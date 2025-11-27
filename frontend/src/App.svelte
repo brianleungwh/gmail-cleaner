@@ -187,10 +187,10 @@
   }
 </script>
 
-<div class="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
-  <div class="container mx-auto px-4 py-12 max-w-7xl">
+<div class="min-h-screen bg-gray-100">
+  <div class="container mx-auto px-4 py-8 max-w-5xl">
     <Header />
-    <div class="space-y-8">
+    <div class="space-y-4">
       <AuthSection />
       <ActionButtons />
       <ProgressSection />

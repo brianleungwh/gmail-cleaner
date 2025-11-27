@@ -23,35 +23,32 @@
 </script>
 
 {#if $progressVisible}
-  <div class="bg-white rounded-2xl shadow-xl shadow-gray-200/50 p-8 border border-gray-100/50 hover:shadow-2xl transition-shadow duration-300">
-    <h3 class="text-2xl font-bold text-gray-900 mb-6">Progress</h3>
+  <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+    <h3 class="text-lg font-semibold text-gray-900 mb-4">Progress</h3>
 
     <!-- Progress Bar -->
-    <div class="bg-gradient-to-r from-purple-100 to-blue-100 rounded-full h-3 mb-4 shadow-inner">
+    <div class="bg-gray-200 rounded-full h-2 mb-3">
       <div
-        class="h-3 rounded-full transition-all duration-300 shadow-md"
-        class:bg-gradient-to-r={!$progressIndeterminate}
-        class:from-purple-500={!$progressIndeterminate}
-        class:to-blue-500={!$progressIndeterminate}
+        class="h-2 rounded-full transition-all duration-300 bg-slate-600"
         class:indeterminate={$progressIndeterminate}
         style="width: {$progressPercent}%"
       ></div>
     </div>
 
-    <div class="text-sm font-medium text-gray-700 mb-6">{$progressText}</div>
+    <div class="text-sm text-gray-600 mb-4">{$progressText}</div>
 
     <!-- Live Log -->
-    <div class="border-2 border-purple-100 rounded-xl overflow-hidden">
-      <div class="bg-gradient-to-r from-purple-50 to-blue-50 px-4 py-3 border-b-2 border-purple-200">
-        <h4 class="text-sm font-bold text-gray-800">Live Activity Log</h4>
+    <div class="border border-gray-200 rounded-lg overflow-hidden">
+      <div class="bg-gray-50 px-4 py-2 border-b border-gray-200">
+        <h4 class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Activity Log</h4>
       </div>
-      <div bind:this={logBoxElement} class="bg-gray-50 p-4 h-64 overflow-y-auto">
+      <div bind:this={logBoxElement} class="bg-white p-3 h-48 overflow-y-auto">
         <div class="space-y-1">
           {#if $logs.length === 0}
-            <div class="text-sm text-gray-500 italic">Log messages will appear here...</div>
+            <div class="text-sm text-gray-400">Log messages will appear here...</div>
           {:else}
             {#each $logs as log}
-              <div class="text-sm {getLogColor(log.type)} font-mono">
+              <div class="text-xs {getLogColor(log.type)} font-mono">
                 <span class="text-gray-400">[{log.timestamp}]</span> {log.message}
               </div>
             {/each}

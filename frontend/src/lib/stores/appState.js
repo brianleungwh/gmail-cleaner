@@ -29,6 +29,12 @@ export const resultsData = writable(null);
 // Sections visibility
 export const domainsVisible = writable(false);
 
+// Filter options state
+export const excludedDomains = writable([]);  // Domains to exclude from scan
+export const useLabelProtection = writable(true);  // Whether custom labels protect threads
+export const protectedLabelIds = writable(null);  // Specific labels to protect (null = all)
+export const availableLabels = writable([]);  // Labels fetched from Gmail
+
 // Derived stores
 export const hasCollectedDomains = derived(domains, $domains => Object.keys($domains).length > 0);
 export const hasSelection = derived(selectedDomains, $selectedDomains => $selectedDomains.size > 0);

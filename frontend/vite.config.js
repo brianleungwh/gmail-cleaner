@@ -16,6 +16,7 @@ export default defineConfig({
       '/collect': 'http://localhost:8000',
       '/cleanup': 'http://localhost:8000',
       '/domains': 'http://localhost:8000',
+      '/labels': 'http://localhost:8000',
       '/health': 'http://localhost:8000',
       '/ws': {
         target: 'ws://localhost:8000',

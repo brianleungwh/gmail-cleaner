@@ -9,7 +9,7 @@ import json
 import os
 import webbrowser
 import logging
-from typing import Dict, Set, Optional
+from typing import Dict, Set, Optional, List
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -30,7 +30,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from pydantic import BaseModel
 
-from app.gmail_service import GmailService, DomainInfo
+from app.gmail_service import GmailService
+from app.models import DomainInfo
 
 logger.info(f"Starting Gmail Cleaner with log level: {LOG_LEVEL}")
 
@@ -92,6 +93,9 @@ class CleanupRequest(BaseModel):
 
 class CollectRequest(BaseModel):
     limit: Optional[int] = None
+    excluded_domains: List[str] = []  # Domains to exclude from scan results
+    use_label_protection: bool = True  # Whether custom labels protect threads
+    protected_label_ids: Optional[List[str]] = None  # Specific labels to protect (None = all)
 
 
 class AuthRequest(BaseModel):
@@ -205,8 +209,13 @@ async def collect_domains(request: CollectRequest):
 
         gmail_service.set_progress_callback(async_progress_callback)
 
-        # Start collection with limit
-        collected_domains = await gmail_service.collect_domains(limit=request.limit)
+        # Start collection with filtering options
+        collected_domains = await gmail_service.collect_domains(
+            limit=request.limit,
+            excluded_domains=set(request.excluded_domains) if request.excluded_domains else None,
+            use_label_protection=request.use_label_protection,
+            protected_label_ids=set(request.protected_label_ids) if request.protected_label_ids else None
+        )
 
         logger.info(f"Collection completed. Found {len(collected_domains)} domains")
 
@@ -266,6 +275,20 @@ async def cleanup_emails(request: CleanupRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
+
+
+@app.get("/labels")
+async def get_labels():
+    """Get all custom Gmail labels for the authenticated user"""
+    if not gmail_service.service:
+        raise HTTPException(status_code=400, detail="Not authenticated. Please authenticate first.")
+
+    try:
+        labels = gmail_service.get_labels()
+        return {"labels": labels}
+    except Exception as e:
+        logger.error(f"Error fetching labels: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch labels: {str(e)}")
 
 
 @app.get("/domains")

@@ -41,7 +41,6 @@ RUN uv pip install --system -e .
 
 # Copy application code
 COPY app/ ./app/
-COPY gmail_cleaner.py ./
 
 # Copy built frontend from frontend-builder stage
 # The build outputs to ./dist in Docker builds

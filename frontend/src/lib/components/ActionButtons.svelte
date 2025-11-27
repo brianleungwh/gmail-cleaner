@@ -6,6 +6,9 @@
     hasCollectedDomains,
     hasSelection,
     selectedDomains,
+    excludedDomains,
+    useLabelProtection,
+    protectedLabelIds,
     addLog,
     showProgress,
     hideProgress,
@@ -30,7 +33,12 @@
       const response = await fetch('/collect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit })
+        body: JSON.stringify({
+          limit,
+          excluded_domains: $excludedDomains,
+          use_label_protection: $useLabelProtection,
+          protected_label_ids: $protectedLabelIds
+        })
       });
 
       if (!response.ok) {

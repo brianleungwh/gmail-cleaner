@@ -15,6 +15,7 @@
 
   import Header from './lib/components/Header.svelte';
   import AuthSection from './lib/components/AuthSection.svelte';
+  import FilterOptions from './lib/components/FilterOptions.svelte';
   import ActionButtons from './lib/components/ActionButtons.svelte';
   import ProgressSection from './lib/components/ProgressSection.svelte';
   import DomainSection from './lib/components/DomainSection.svelte';
@@ -192,6 +193,7 @@
     <Header />
     <div class="space-y-4">
       <AuthSection />
+      <FilterOptions />
       <ActionButtons />
       <ProgressSection />
       <DomainSection />

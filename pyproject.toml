@@ -31,4 +31,3 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
-include = ["gmail_cleaner.py"]

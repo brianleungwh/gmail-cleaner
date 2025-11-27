@@ -1,4 +1,6 @@
-<div class="bg-white rounded-lg shadow-md p-6 mb-6">
-  <h1 class="text-3xl font-bold text-gray-800 mb-2">Gmail Cleaner</h1>
-  <p class="text-gray-600">Clean your Gmail inbox by reviewing and selecting domains to delete</p>
+<div class="bg-slate-800 rounded-xl shadow-lg p-6 mb-6">
+  <h1 class="text-2xl font-bold text-white">
+    Gmail Cleaner
+  </h1>
+  <p class="text-slate-400 text-sm mt-1">Clean your inbox by reviewing and selecting domains to delete</p>
 </div>

@@ -42,7 +42,6 @@
 
   function handleWebSocketMessage(message) {
     const { type, data } = message;
-    console.log('Handling WebSocket message type:', type, 'data:', data);
 
     switch (type) {
       case 'authenticated':
@@ -76,7 +75,7 @@
         handleError(data);
         break;
       default:
-        console.log('Unknown message type:', type, data);
+        console.warn('Unknown WebSocket message type:', type, data);
     }
   }
 
@@ -188,13 +187,15 @@
   }
 </script>
 
-<div class="bg-gray-50 min-h-screen">
-  <div class="container mx-auto px-4 py-8 max-w-6xl">
+<div class="min-h-screen bg-gray-100">
+  <div class="container mx-auto px-4 py-8 max-w-5xl">
     <Header />
-    <AuthSection />
-    <ActionButtons />
-    <ProgressSection />
-    <DomainSection />
-    <ResultsSection />
+    <div class="space-y-4">
+      <AuthSection />
+      <ActionButtons />
+      <ProgressSection />
+      <DomainSection />
+      <ResultsSection />
+    </div>
   </div>
 </div>

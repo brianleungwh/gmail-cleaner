@@ -19,7 +19,6 @@
   async function collectDomains() {
     if ($isCollecting) return;
 
-    console.log('Starting domain collection...');
     $isCollecting = true;
     showProgress();
     collectBtnText = 'Scanning...';
@@ -40,7 +39,6 @@
       }
 
       const result = await response.json();
-      console.log('Collection response:', result);
 
       // Data will be handled via WebSocket messages
     } catch (error) {
@@ -106,45 +104,44 @@
   $: cleanupDisabled = !$hasCollectedDomains || !$hasSelection || $isCleaning;
 </script>
 
-<div class="bg-white rounded-lg shadow-md p-6 mb-6">
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
   <div class="flex flex-col gap-4">
     <!-- Scan Controls -->
     <div class="flex flex-wrap items-center gap-4">
       <button
         on:click={collectDomains}
         disabled={collectDisabled}
-        class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
+        class="bg-slate-800 hover:bg-slate-700 text-white font-medium py-2 px-5 rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
       >
         {collectBtnText}
       </button>
 
       <div class="flex items-center gap-2">
-        <label for="scan-limit" class="text-sm text-gray-600">Limit threads:</label>
+        <label for="scan-limit" class="text-sm text-gray-600">Limit:</label>
         <input
           id="scan-limit"
           type="number"
           bind:value={scanLimitInput}
           placeholder="All"
           min="1"
-          class="w-24 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+          class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-sm"
         />
-        <span class="text-xs text-gray-500">(leave empty for all)</span>
       </div>
     </div>
 
     <!-- Cleanup Controls -->
-    <div class="flex flex-wrap gap-4">
+    <div class="flex flex-wrap gap-3">
       <button
         on:click={previewCleanup}
         disabled={previewDisabled}
-        class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
+        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-5 rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
       >
         Preview Cleanup
       </button>
       <button
         on:click={executeCleanup}
         disabled={cleanupDisabled}
-        class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
+        class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-5 rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
       >
         Execute Cleanup
       </button>

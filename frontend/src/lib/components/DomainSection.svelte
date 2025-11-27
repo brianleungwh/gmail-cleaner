@@ -1,43 +1,35 @@
 <script>
   import { domainsVisible, domains, selectedDomains, selectedCount } from '../stores/appState';
   import DomainItem from './DomainItem.svelte';
-  import Fuse from 'fuse.js';
 
   let searchQuery = '';
-  let fuse = null;
   let filteredDomains = [];
-
-  // Initialize fuzzy search when domains change
-  $: if (Object.keys($domains).length > 0) {
-    const searchData = Object.entries($domains).map(([domain, info]) => ({
-      domain,
-      count: info.count,
-      // Search through all thread subjects, not just samples
-      subjects: info.threads?.map(t => t.subject).join(' ') || ''
-    }));
-
-    fuse = new Fuse(searchData, {
-      keys: ['domain', 'subjects'],
-      threshold: 0.3,
-      includeScore: true
-    });
-
-    // Update filtered domains when search query or domains change
-    updateFilteredDomains();
-  }
 
   function updateFilteredDomains() {
     if (!searchQuery.trim()) {
       filteredDomains = Object.entries($domains);
-    } else if (fuse) {
-      const results = fuse.search(searchQuery);
-      filteredDomains = results.map(result => [result.item.domain, $domains[result.item.domain]]);
+    } else {
+      const query = searchQuery.toLowerCase();
+
+      filteredDomains = Object.entries($domains).filter(([domain, info]) => {
+        // Search in domain name
+        if (domain.toLowerCase().includes(query)) {
+          return true;
+        }
+
+        // Search in thread subjects
+        const threads = info.threads || [];
+        return threads.some(thread =>
+          thread.subject.toLowerCase().includes(query)
+        );
+      });
     }
   }
 
-  // Update filtered domains when search query changes
+  // Update filtered domains when domains or search query changes
   $: {
-    searchQuery;
+    $domains;  // React to domains changes
+    searchQuery;  // React to search query changes
     updateFilteredDomains();
   }
 
@@ -65,22 +57,22 @@
 </script>
 
 {#if $domainsVisible}
-  <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+  <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
     <!-- Header -->
     <div class="mb-6">
-      <h3 class="text-xl font-semibold text-gray-800 mb-2">Review Domains</h3>
-      <p class="text-sm text-gray-600">Select domains to delete. Protected emails (starred, important, or labeled) are excluded.</p>
+      <h3 class="text-lg font-semibold text-gray-900 mb-1">Review Domains</h3>
+      <p class="text-sm text-gray-500">Select domains to delete. Protected emails (starred, important, or labeled) are excluded.</p>
     </div>
 
     <!-- Controls Bar -->
-    <div class="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+    <div class="mb-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
       <!-- Search Box -->
       <div class="w-full sm:w-auto sm:flex-1 sm:max-w-md">
         <input
           bind:value={searchQuery}
           type="text"
           placeholder="Search domains and subjects..."
-          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-sm"
         >
         <div class="text-xs text-gray-500 mt-1">{searchResultsText}</div>
       </div>
@@ -89,13 +81,13 @@
       <div class="flex gap-2 flex-shrink-0">
         <button
           on:click={selectAll}
-          class="bg-gray-500 hover:bg-gray-600 text-white text-sm font-medium py-2 px-4 rounded transition-colors"
+          class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg transition-colors"
         >
           Select All
         </button>
         <button
           on:click={deselectAll}
-          class="bg-gray-500 hover:bg-gray-600 text-white text-sm font-medium py-2 px-4 rounded transition-colors"
+          class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium py-2 px-4 rounded-lg transition-colors"
         >
           Deselect All
         </button>
@@ -103,19 +95,19 @@
     </div>
 
     <!-- Table Header -->
-    <div class="bg-gray-50 border-b-2 border-gray-200 px-4 py-3 rounded-t-lg">
+    <div class="bg-gray-50 border-b border-gray-200 px-4 py-3 rounded-t-lg">
       <div class="flex items-center gap-3">
         <div class="w-5"></div>
-        <div class="flex-1 text-sm font-semibold text-gray-700">Domain</div>
-        <div class="w-24 text-sm font-semibold text-gray-700 text-right">Threads</div>
-        <div class="w-10"></div>
+        <div class="flex-1 text-xs font-semibold text-gray-600 uppercase tracking-wide">Domain</div>
+        <div class="w-20 text-xs font-semibold text-gray-600 uppercase tracking-wide text-right">Threads</div>
+        <div class="w-8"></div>
       </div>
     </div>
 
     <!-- Domain List -->
-    <div class="border-x border-b border-gray-200 rounded-b-lg">
+    <div class="border border-t-0 border-gray-200 rounded-b-lg overflow-hidden">
       {#if filteredDomains.length === 0}
-        <div class="p-8 text-center text-gray-500">
+        <div class="p-6 text-center text-gray-500 text-sm">
           {#if searchQuery.trim()}
             No domains match your search.
           {:else}
@@ -124,7 +116,7 @@
         </div>
       {:else}
         {#each filteredDomains as [domain, info], index (domain)}
-          <div class:border-t={index > 0} class="border-gray-200">
+          <div class:border-t={index > 0} class="border-gray-100">
             <DomainItem {domain} {info} />
           </div>
         {/each}
@@ -132,14 +124,14 @@
     </div>
 
     <!-- Summary Footer -->
-    <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+    <div class="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
       <div class="flex items-center justify-between">
-        <div class="text-sm font-medium text-blue-900">
+        <div class="text-sm font-medium text-gray-700">
           {$selectedCount} {$selectedCount === 1 ? 'domain' : 'domains'} selected for deletion
         </div>
         {#if $selectedCount > 0}
-          <div class="text-xs text-blue-700">
-            Review your selection, then use Preview or Execute below
+          <div class="text-xs text-gray-500">
+            Review your selection, then use Preview or Execute above
           </div>
         {/if}
       </div>

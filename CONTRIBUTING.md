@@ -51,7 +51,7 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 1. **Fork and clone the repository**
    ```bash
-   git clone https://github.com/yourusername/gmail-cleaner.git
+   git clone https://github.com/brianleungwh/gmail-cleaner.git
    cd gmail-cleaner
    ```
 

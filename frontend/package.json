@@ -1,8 +1,14 @@
 {
-  "name": "frontend",
-  "private": true,
-  "version": "0.0.0",
+  "name": "gmail-cleaner-frontend",
+  "version": "0.1.0",
+  "description": "Frontend for Gmail Cleaner - a web-based tool to declutter your Gmail inbox",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brianleungwh/gmail-cleaner.git",
+    "directory": "frontend"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

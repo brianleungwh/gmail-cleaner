@@ -2,8 +2,9 @@
 
 A web-based tool to help you declutter your Gmail inbox by identifying and removing emails from specific sender domains. Clean up thousands of promotional emails, newsletters, and spam in minutes!
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+[![CI](https://github.com/brianleungwh/gmail-cleaner/actions/workflows/ci.yml/badge.svg)](https://github.com/brianleungwh/gmail-cleaner/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Python](https://img.shields.io/badge/python-3.9+-blue.svg)
 ![Svelte](https://img.shields.io/badge/svelte-5-orange.svg)
 
 ## Features
@@ -68,7 +69,7 @@ The easiest way to get started:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/gmail-cleaner.git
+git clone https://github.com/brianleungwh/gmail-cleaner.git
 cd gmail-cleaner
 
 # Start the application
@@ -327,7 +328,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 If you encounter any issues or have questions:
 
-1. Check the [Issues](https://github.com/yourusername/gmail-cleaner/issues) page
+1. Check the [Issues](https://github.com/brianleungwh/gmail-cleaner/issues) page
 2. Create a new issue with detailed information
 3. Include logs and error messages when applicable
 

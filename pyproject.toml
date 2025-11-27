@@ -12,6 +12,19 @@ name = "gmail-cleaner"
 version = "0.1.0"
 description = "Gmail inbox cleaner with web interface"
 requires-python = ">=3.9"
+license = "MIT"
+keywords = ["gmail", "email", "cleanup", "inbox", "automation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: FastAPI",
+    "Topic :: Communications :: Email",
+]
 dependencies = [
     "google-auth>=2.29.0",
     "google-auth-oauthlib>=1.2.0",
@@ -24,6 +37,11 @@ dependencies = [
     "uvicorn[standard]>=0.24.0",
     "pydantic>=2.5.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/brianleungwh/gmail-cleaner"
+Repository = "https://github.com/brianleungwh/gmail-cleaner"
+Issues = "https://github.com/brianleungwh/gmail-cleaner/issues"
 
 [project.optional-dependencies]
 test = [

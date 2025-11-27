@@ -2,12 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, 'feature/**' ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
 
 jobs:
-  backend:
+  test:
     name: Backend Tests
     runs-on: ubuntu-latest
 
@@ -23,22 +23,13 @@ jobs:
       run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
     - name: Install dependencies
-      run: |
-        uv pip install --system -e .
-        uv pip install --system pytest pytest-cov
+      run: uv pip install --system -e ".[test]"
 
     - name: Run tests
-      run: pytest tests/ --cov=app --cov-report=xml || echo "Tests not yet implemented"
+      run: pytest tests/ -v
 
-    - name: Upload coverage
-      uses: codecov/codecov-action@v3
-      if: success()
-      with:
-        files: ./coverage.xml
-        flags: backend
-
-  frontend:
-    name: Frontend Tests
+  build:
+    name: Frontend Build
     runs-on: ubuntu-latest
 
     steps:
@@ -58,26 +49,3 @@ jobs:
     - name: Build frontend
       working-directory: frontend
       run: npm run build
-
-    - name: Run tests
-      working-directory: frontend
-      run: npm test || echo "Tests not yet implemented"
-
-  docker:
-    name: Docker Build
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Build Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: false
-        tags: gmail-cleaner:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max

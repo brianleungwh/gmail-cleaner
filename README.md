@@ -134,24 +134,30 @@ This builds the frontend to `app/static/` for FastAPI to serve.
 
 ```
 gmail-cleaner/
-├── app/                      # Backend application
-│   ├── main.py              # FastAPI app with endpoints
-│   ├── gmail_service.py     # Gmail API integration
-│   └── static/              # Built frontend files (generated)
-├── frontend/                # Frontend application
+├── app/                      # Backend
+│   ├── main.py              # FastAPI endpoints
+│   ├── gmail_service.py     # Gmail API wrapper
+│   ├── collector.py         # Domain collection logic
+│   ├── cleaner.py           # Email cleanup logic
+│   ├── models.py            # Data models
+│   └── static/              # Built frontend (generated)
+├── frontend/                # Frontend
 │   ├── src/
-│   │   ├── lib/
-│   │   │   ├── components/  # Svelte components
-│   │   │   └── stores/      # State management
-│   │   ├── App.svelte       # Main app component
-│   │   └── main.js          # Entry point
+│   │   ├── App.svelte
+│   │   ├── main.js
+│   │   └── lib/
+│   │       ├── components/  # UI components
+│   │       └── stores/      # State management
 │   ├── package.json
 │   └── vite.config.js
-├── data/                    # Credentials storage (gitignored)
-├── docker-compose.yml       # Docker Compose configuration
-├── Dockerfile               # Multi-stage Docker build
-├── pyproject.toml          # Python dependencies
-└── README.md               # This file
+├── tests/                   # Backend tests
+│   ├── conftest.py
+│   ├── test_collector.py
+│   └── test_cleaner.py
+├── .github/workflows/       # CI pipeline
+├── docker-compose.yml
+├── Dockerfile
+└── pyproject.toml
 ```
 
 ## API Endpoints

@@ -7,20 +7,53 @@ A web-based tool to help you declutter your Gmail inbox by identifying and remov
 ![Python](https://img.shields.io/badge/python-3.9+-blue.svg)
 ![Svelte](https://img.shields.io/badge/svelte-5-orange.svg)
 
+## Screencast
+
+> Screencast placeholder
+
+## Prerequisites
+
+Before you begin, you'll need:
+
+1. **Google Cloud Console credentials**
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select existing one
+   - Enable the Gmail API
+   - Create OAuth 2.0 credentials (Desktop app)
+   - Download the credentials as JSON
+
+2. **Development Tools** (choose one):
+   - **Docker** (recommended) - For containerized deployment
+   - **Python 3.11+** and **Node.js 20+** - For local development
+
+
+## Quick Start with Docker
+
+The easiest way to get started:
+
+```bash
+# Clone the repository
+git clone https://github.com/brianleungwh/gmail-cleaner.git
+cd gmail-cleaner
+
+# Start the application
+docker-compose up --build
+
+# Open your browser
+open http://localhost:8000
+```
+
+The app will be available at http://localhost:8000. Upload your credentials file and start cleaning!
+
 ## Features
 
 - 🔍 **Smart Domain Analysis** - Scan your entire inbox and group emails by sender domain
 - 📊 **Visual Review** - See email counts and sample subjects for each domain before deleting
-- 🔎 **Fuzzy Search** - Quickly find domains using intelligent search
 - 🛡️ **Safe Cleanup** - Preview mode lets you see what will be deleted before taking action
 - 🔐 **Protected Emails** - Automatically preserves starred, important, and labeled emails
 - ⚡ **Real-time Progress** - Live WebSocket updates show progress as you scan and clean
 - 🐳 **Docker Support** - One-command deployment with Docker Compose
-- 🎨 **Modern UI** - Built with Svelte and Tailwind CSS for a smooth experience
 
-## Screenshots
-
-> *Screenshots coming soon*
 
 ## How It Works
 
@@ -44,42 +77,6 @@ A web-based tool to help you declutter your Gmail inbox by identifying and remov
 - **Tailwind CSS** - Utility-first styling
 - **Fuse.js** - Fuzzy search
 
-### Infrastructure
-- **Docker** - Containerized deployment
-- **uv** - Fast Python package manager
-
-## Prerequisites
-
-Before you begin, you'll need:
-
-1. **Google Cloud Console credentials**
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project or select existing one
-   - Enable the Gmail API
-   - Create OAuth 2.0 credentials (Desktop app)
-   - Download the credentials as JSON
-
-2. **Development Tools** (choose one):
-   - **Docker** (recommended) - For containerized deployment
-   - **Python 3.11+** and **Node.js 20+** - For local development
-
-## Quick Start with Docker
-
-The easiest way to get started:
-
-```bash
-# Clone the repository
-git clone https://github.com/brianleungwh/gmail-cleaner.git
-cd gmail-cleaner
-
-# Start the application
-docker-compose up --build
-
-# Open your browser
-open http://localhost:8000
-```
-
-The app will be available at http://localhost:8000. Upload your credentials file and start cleaning!
 
 ## Local Development Setup
 
@@ -122,27 +119,11 @@ npm run build
 
 This builds the frontend to `app/static/` for FastAPI to serve.
 
-## Configuration
-
-### Environment Variables
-
-Create a `.env` file in the project root (optional):
-
-```env
-# OAuth Redirect URI (default: http://localhost:8000/oauth/callback)
-OAUTH_REDIRECT_URI=http://localhost:8000/oauth/callback
-
-# Maximum emails to process per batch
-BATCH_SIZE=100
-
-# Dry run mode (default: true)
-DRY_RUN=true
-```
 
 ### OAuth Setup
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
+2. Create a new project or select an existing one. If creating a new project, you can name it whatever you want.
 3. Navigate to "APIs & Services" > "Enable APIs and Services"
 4. Search for and enable "Gmail API"
 5. Go to "Credentials" > "Create Credentials" > "OAuth client ID"
@@ -150,42 +131,6 @@ DRY_RUN=true
 7. Download the credentials JSON file
 8. Upload this file in the web interface when you first run the app
 
-**Important**: Add `http://localhost:8000/oauth/callback` to your authorized redirect URIs in the Google Cloud Console.
-
-## Usage
-
-### 1. Authenticate
-
-1. Open the app in your browser (http://localhost:8000)
-2. Upload your OAuth credentials JSON file
-3. Click "Connect Gmail"
-4. Authorize the app in the Google OAuth flow
-
-### 2. Scan Your Inbox
-
-1. Click "Scan Inbox"
-2. Wait for the scan to complete (progress shown in real-time)
-3. Review the list of domains found
-
-### 3. Select Domains to Delete
-
-1. Use the search box to find specific domains
-2. Click checkboxes to select domains
-3. Expand domains to see sample email subjects
-4. Use "Select All" / "Deselect All" for bulk operations
-
-### 4. Preview Changes
-
-1. Click "Preview Cleanup" to see what will be deleted
-2. Review the log to verify the selections
-3. Check the results summary
-
-### 5. Execute Cleanup
-
-1. Click "Execute Cleanup"
-2. Confirm the action
-3. Wait for completion
-4. Check your Gmail trash to verify
 
 ## Project Structure
 
@@ -229,71 +174,7 @@ gmail-cleaner/
 - **Local Storage** - Credentials stored locally, never sent to external servers
 - **Read-Only Inbox** - Only modifies emails you explicitly select
 - **Protected Emails** - Starred, important, and labeled emails are automatically protected
-- **Trash Only** - Emails are moved to trash, not permanently deleted
 - **No Tracking** - No analytics or external data collection
-
-## Development
-
-### Running Tests
-
-```bash
-# Backend tests
-pytest
-
-# Frontend tests
-cd frontend
-npm test
-```
-
-### Code Style
-
-```bash
-# Python formatting
-black app/
-
-# Python linting
-ruff check app/
-
-# Frontend formatting
-cd frontend
-npm run format
-```
-
-### Building for Production
-
-```bash
-# Build frontend
-cd frontend
-npm run build
-
-# Build Docker image
-docker build -t gmail-cleaner .
-
-# Run production container
-docker run -p 8000:8000 -v ./data:/app/data gmail-cleaner
-```
-
-## Troubleshooting
-
-### "Not authenticated" error
-- Make sure you've uploaded valid OAuth credentials
-- Check that the redirect URI matches your Google Cloud Console settings
-- Try deleting `data/token.json` and re-authenticating
-
-### WebSocket connection fails
-- Ensure both frontend and backend are running
-- Check browser console for connection errors
-- Verify firewall settings aren't blocking WebSocket connections
-
-### OAuth redirect fails
-- Verify the redirect URI in Google Cloud Console matches `http://localhost:8000/oauth/callback`
-- Clear browser cookies and try again
-- Check that the credentials file is valid JSON
-
-### Docker build fails
-- Ensure Docker is installed and running
-- Try `docker-compose down -v` and rebuild
-- Check that port 8000 is not already in use
 
 ## Contributing
 
@@ -305,24 +186,6 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## Roadmap
-
-- [ ] Add Gmail filters creation based on domains
-- [ ] Export domain lists to CSV/JSON
-- [ ] Support for custom label-based cleanup
-- [ ] Scheduled automatic cleanup
-- [ ] Email analytics and insights
-- [ ] Support for multiple Gmail accounts
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Built with [FastAPI](https://fastapi.tiangolo.com/)
-- UI powered by [Svelte](https://svelte.dev/) and [Tailwind CSS](https://tailwindcss.com/)
-- Gmail integration via [Google APIs](https://developers.google.com/gmail/api)
 
 ## Support
 
@@ -334,7 +197,7 @@ If you encounter any issues or have questions:
 
 ## Disclaimer
 
-This tool modifies your Gmail inbox. While it moves emails to trash (not permanent deletion) and protects important emails, always:
+This tool modifies your Gmail inbox. Always:
 
 - Use preview mode first
 - Review selections carefully
@@ -345,4 +208,3 @@ This tool modifies your Gmail inbox. While it moves emails to trash (not permane
 
 ---
 
-Made with ❤️ by the community

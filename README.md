@@ -1,30 +1,38 @@
 # Gmail Cleaner
 
-A web-based tool to help you declutter your Gmail inbox by identifying and removing emails from specific sender domains. Clean up thousands of promotional emails, newsletters, and spam in minutes!
+An open source tool that runs locally on your machine to help you declutter your Gmail inbox. Scan your inbox by sender domain and bulk delete thousands of promotional emails, newsletters, and spam in minutes.
 
 [![CI](https://github.com/brianleungwh/gmail-cleaner/actions/workflows/ci.yml/badge.svg)](https://github.com/brianleungwh/gmail-cleaner/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Python](https://img.shields.io/badge/python-3.9+-blue.svg)
 ![Svelte](https://img.shields.io/badge/svelte-5-orange.svg)
 
+## Why build this?
+
+I'm someone who lets junk emails pile up for years. Paid inbox cleaners exist, but I didn't want to pay. The free alternatives mostly use IMAP, which never cleaned my inbox as aggressively as I needed. So I built this tool using the Gmail API to do exactly what I wanted: scan my entire inbox by sender domain and nuke thousands of emails at once.
+
 ## Screencast
 
 > Screencast placeholder
 
+## Opinionated
+
+This tool assumes you mark emails you want to keep — whether by starring, letting Gmail mark them as important, or organizing with custom labels. Emails with any of these signals are automatically protected and won't appear in scan results. Everything else is fair game for cleanup.
+
+This means you can safely select entire domains for deletion without worrying about losing emails you've already organized or marked as important.
+
 ## Prerequisites
 
-Before you begin, you'll need:
+#### OAuth Setup
 
-1. **Google Cloud Console credentials**
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project or select existing one
-   - Enable the Gmail API
-   - Create OAuth 2.0 credentials (Desktop app)
-   - Download the credentials as JSON
-
-2. **Development Tools** (choose one):
-   - **Docker** (recommended) - For containerized deployment
-   - **Python 3.11+** and **Node.js 20+** - For local development
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one. If creating a new project, you can name it whatever you want.
+3. Navigate to "APIs & Services" > "Enable APIs and Services"
+4. Search for and enable "Gmail API"
+5. Go to "Credentials" > "Create Credentials" > "OAuth client ID"
+6. Choose "Desktop app" as the application type
+7. Download the credentials JSON file
+8. Upload this file in the web interface when you first run the app
 
 
 ## Quick Start with Docker
@@ -120,16 +128,6 @@ npm run build
 This builds the frontend to `app/static/` for FastAPI to serve.
 
 
-### OAuth Setup
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one. If creating a new project, you can name it whatever you want.
-3. Navigate to "APIs & Services" > "Enable APIs and Services"
-4. Search for and enable "Gmail API"
-5. Go to "Credentials" > "Create Credentials" > "OAuth client ID"
-6. Choose "Desktop app" as the application type
-7. Download the credentials JSON file
-8. Upload this file in the web interface when you first run the app
 
 
 ## Project Structure

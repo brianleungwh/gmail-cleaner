@@ -13,7 +13,7 @@ I'm someone who lets junk emails pile up for years. Paid inbox cleaners exist, b
 
 ## Screencast
 
-> Screencast placeholder
+[![Demo](https://img.youtube.com/vi/eX4gbwBRxIE/maxresdefault.jpg)](https://www.youtube.com/watch?v=eX4gbwBRxIE)
 
 ## Opinionated
 

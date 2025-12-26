@@ -81,6 +81,7 @@ manager = ConnectionManager()
 # Progress callback for Gmail service
 async def progress_callback(message_type: str, data: Dict):
     """Forward Gmail service progress to WebSocket clients"""
+    logger.debug(f"Progress callback: {message_type} - {data}")
     await manager.broadcast(message_type, data)
 
 
@@ -201,13 +202,7 @@ async def collect_domains(request: CollectRequest):
 
     try:
         logger.info(f"Starting domain collection with limit: {request.limit}...")
-        # Set up progress callback
-        # Create a wrapper to ensure compatibility
-        async def async_progress_callback(msg_type: str, data: Dict):
-            logger.debug(f"Progress callback: {msg_type} - {data}")
-            await manager.broadcast(msg_type, data)
-
-        gmail_service.set_progress_callback(async_progress_callback)
+        gmail_service.set_progress_callback(progress_callback)
 
         # Start collection with filtering options
         collected_domains = await gmail_service.collect_domains(
@@ -250,14 +245,7 @@ async def cleanup_emails(request: CleanupRequest):
         raise HTTPException(status_code=400, detail="Not authenticated. Please authenticate first.")
     
     try:
-        # Set up progress callback with async wrapper
-        async def async_progress_callback(msg_type: str, data: Dict):
-            logger.debug(f"Progress callback: {msg_type} - {data}")
-            await manager.broadcast(msg_type, data)
-
-        gmail_service.set_progress_callback(async_progress_callback)
-        
-        # Convert list to set
+        gmail_service.set_progress_callback(progress_callback)
         junk_domains = set(request.domains)
         
         # Start cleanup

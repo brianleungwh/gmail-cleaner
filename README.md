@@ -11,9 +11,9 @@ An open source tool that runs locally on your machine to help you declutter your
 
 I'm someone who lets junk emails pile up for years. Paid inbox cleaners exist, but I didn't want to pay. The free alternatives mostly use IMAP, which never cleaned my inbox as aggressively as I needed. So I built this tool using the Gmail API to do exactly what I wanted: scan my entire inbox by sender domain and nuke thousands of emails at once.
 
-## Screencast
+## Demo
 
-[![Demo](https://img.youtube.com/vi/eX4gbwBRxIE/maxresdefault.jpg)](https://www.youtube.com/watch?v=eX4gbwBRxIE)
+https://github.com/user-attachments/assets/c0da139b-7612-4b28-bf40-eccda4eedcda
 
 ## Opinionated
 

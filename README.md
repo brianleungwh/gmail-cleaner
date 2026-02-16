@@ -1,10 +1,11 @@
 # Gmail Cleaner
 
-An open source tool that runs locally on your machine to help you declutter your Gmail inbox. Scan your inbox by sender domain and bulk delete thousands of promotional emails, newsletters, and spam in minutes.
+A free, open source tool to declutter your Gmail inbox. Scan your inbox by sender domain and bulk delete thousands of promotional emails, newsletters, and spam in minutes.
+
+**Your emails never leave your browser.** This app runs entirely client-side. No server processes your data.
 
 [![CI](https://github.com/brianleungwh/gmail-cleaner/actions/workflows/ci.yml/badge.svg)](https://github.com/brianleungwh/gmail-cleaner/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-![Python](https://img.shields.io/badge/python-3.9+-blue.svg)
 ![Svelte](https://img.shields.io/badge/svelte-5-orange.svg)
 
 ## Why build this?
@@ -17,55 +18,22 @@ https://github.com/user-attachments/assets/c0da139b-7612-4b28-bf40-eccda4eedcda
 
 ## Opinionated
 
-This tool assumes you mark emails you want to keep — whether by starring, letting Gmail mark them as important, or organizing with custom labels. Emails with any of these signals are automatically protected and won't appear in scan results. Everything else is fair game for cleanup.
+This tool assumes you mark emails you want to keep -- whether by starring, letting Gmail mark them as important, or organizing with custom labels. Emails with any of these signals are automatically protected and won't appear in scan results. Everything else is fair game for cleanup.
 
 This means you can safely select entire domains for deletion without worrying about losing emails you've already organized or marked as important.
 
-## Prerequisites
-
-#### OAuth Setup
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one. If creating a new project, you can name it whatever you want.
-3. Navigate to "APIs & Services" > "Enable APIs and Services"
-4. Search for and enable "Gmail API"
-5. Go to "Credentials" > "Create Credentials" > "OAuth client ID"
-6. Choose "Desktop app" as the application type
-7. Download the credentials JSON file
-8. Upload this file in the web interface when you first run the app
-
-
-## Quick Start with Docker
-
-The easiest way to get started:
-
-```bash
-# Clone the repository
-git clone https://github.com/brianleungwh/gmail-cleaner.git
-cd gmail-cleaner
-
-# Start the application
-docker-compose up --build
-
-# Open your browser
-open http://localhost:8000
-```
-
-The app will be available at http://localhost:8000. Upload your credentials file and start cleaning!
-
 ## Features
 
-- 🔍 **Smart Domain Analysis** - Scan your entire inbox and group emails by sender domain
-- 📊 **Visual Review** - See email counts and sample subjects for each domain before deleting
-- 🛡️ **Safe Cleanup** - Preview mode lets you see what will be deleted before taking action
-- 🔐 **Protected Emails** - Automatically preserves starred, important, and labeled emails
-- ⚡ **Real-time Progress** - Live WebSocket updates show progress as you scan and clean
-- 🐳 **Docker Support** - One-command deployment with Docker Compose
-
+- **Smart Domain Analysis** - Scan your entire inbox and group emails by sender domain
+- **Visual Review** - See email counts and sample subjects for each domain before deleting
+- **Safe Cleanup** - Preview mode lets you see what will be deleted before taking action
+- **Protected Emails** - Automatically preserves starred, important, and labeled emails
+- **Real-time Progress** - Live progress updates as you scan and clean
+- **100% Client-Side** - Your Gmail token never leaves your browser. No server-side processing.
 
 ## How It Works
 
-1. **Authenticate** - Upload your Google OAuth credentials to securely connect to Gmail
+1. **Sign In** - Click "Sign in with Google" to grant temporary access
 2. **Scan** - The tool scans your inbox and catalogs all sender domains
 3. **Review** - Browse domains, see sample subjects, and select which ones to delete
 4. **Preview** - Run a dry-run to see exactly what will be deleted
@@ -73,112 +41,99 @@ The app will be available at http://localhost:8000. Upload your credentials file
 
 ## Tech Stack
 
-### Backend
-- **FastAPI** - Modern Python web framework
-- **Google Gmail API** - Secure Gmail access
-- **WebSockets** - Real-time progress updates
-- **Python 3.11+** - Type hints and async/await
-
-### Frontend
-- **Svelte** - Reactive UI framework
+- **Svelte 5** - Reactive UI framework
 - **Vite** - Fast build tool
 - **Tailwind CSS** - Utility-first styling
-- **Fuse.js** - Fuzzy search
+- **Google Identity Services (GIS)** - Browser-based OAuth
+- **gapi.client** - Gmail API calls directly from the browser
 
+## Security & Privacy
 
-## Local Development Setup
+- **Client-side only** - All Gmail API calls go directly from your browser to Google's servers
+- **No backend** - The app is a static site. There is no server to intercept your data
+- **Token in memory** - Your access token lives only in browser memory and expires after ~1 hour
+- **Open source** - Inspect every line of code yourself
 
-### 1. Backend Setup
+## Setup for Development
+
+### Prerequisites
+
+You need a Google Cloud project with the Gmail API enabled and an OAuth client configured:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project (or select an existing one)
+3. Navigate to "APIs & Services" > "Enable APIs and Services"
+4. Search for and enable **Gmail API**
+5. Go to "APIs & Services" > "Credentials"
+6. Click "Create Credentials" > **API key** - note this key
+7. Click "Create Credentials" > **OAuth client ID**
+   - Application type: **Web application**
+   - Authorized JavaScript origins: `http://localhost:5173` (for dev)
+   - Authorized redirect URIs: `http://localhost:5173` (for dev)
+8. Note the **Client ID**
+
+### Install & Run
 
 ```bash
-# Install uv (Python package manager)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install Python dependencies
-uv pip install -e .
-
-# Start the FastAPI server
-uv run python -m uvicorn app.main:app --reload
-```
-
-The backend will be available at http://localhost:8000
-
-### 2. Frontend Setup
-
-```bash
-# Navigate to frontend directory
 cd frontend
+
+# Create .env file with your credentials
+cp .env.example .env
+# Edit .env with your VITE_GOOGLE_CLIENT_ID and VITE_GOOGLE_API_KEY
 
 # Install dependencies
 npm install
 
-# Start the dev server
+# Start dev server
 npm run dev
 ```
 
-The frontend dev server will be available at http://localhost:5173
+The app will be available at http://localhost:5173
 
-For production builds:
+### Run Tests
+
+```bash
+cd frontend
+npm test
+```
+
+### Build for Production
 
 ```bash
 cd frontend
 npm run build
 ```
 
-This builds the frontend to `app/static/` for FastAPI to serve.
+The built files will be in `frontend/dist/`. Deploy to any static host (GitHub Pages, Netlify, Vercel, etc.).
 
-
-
+When deploying, add your production URL to the OAuth client's authorized JavaScript origins and redirect URIs.
 
 ## Project Structure
 
 ```
 gmail-cleaner/
-├── app/                      # Backend
-│   ├── main.py              # FastAPI endpoints
-│   ├── gmail_service.py     # Gmail API wrapper
-│   ├── collector.py         # Domain collection logic
-│   ├── cleaner.py           # Email cleanup logic
-│   ├── models.py            # Data models
-│   └── static/              # Built frontend (generated)
-├── frontend/                # Frontend
+├── frontend/
 │   ├── src/
-│   │   ├── App.svelte
-│   │   ├── main.js
+│   │   ├── App.svelte                  # Main app component
+│   │   ├── main.js                     # Entry point
 │   │   └── lib/
-│   │       ├── components/  # UI components
-│   │       └── stores/      # State management
+│   │       ├── gmail/                  # Gmail API modules
+│   │       │   ├── api.js              # Gmail REST API wrapper (via gapi)
+│   │       │   ├── auth.js             # GIS OAuth + gapi initialization
+│   │       │   ├── collector.js        # Domain scanning logic
+│   │       │   ├── cleaner.js          # Email cleanup logic
+│   │       │   ├── progressHandler.js  # Progress event -> store updates
+│   │       │   └── __tests__/          # Vitest tests
+│   │       ├── components/             # Svelte UI components
+│   │       └── stores/                 # Svelte stores (state)
+│   ├── index.html
 │   ├── package.json
 │   └── vite.config.js
-├── tests/                   # Backend tests
-│   ├── conftest.py
-│   ├── test_collector.py
-│   └── test_cleaner.py
-├── .github/workflows/       # CI pipeline
-├── docker-compose.yml
-├── Dockerfile
-└── pyproject.toml
+├── .github/workflows/                  # CI pipeline
+├── README.md
+├── CONTRIBUTING.md
+└── LICENSE
 ```
-
-## API Endpoints
-
-- `GET /` - Serve the web application
-- `GET /health` - Health check endpoint
-- `GET /auth/status` - Check authentication status
-- `POST /auth/upload` - Upload OAuth credentials
-- `GET /oauth/callback` - OAuth callback handler
-- `POST /collect` - Start domain collection
-- `POST /cleanup` - Execute cleanup (with dry_run option)
-- `GET /domains` - Get collected domains
-- `WebSocket /ws` - Real-time progress updates
-
-## Security & Privacy
-
-- **OAuth 2.0** - Secure authentication via Google
-- **Local Storage** - Credentials stored locally, never sent to external servers
-- **Read-Only Inbox** - Only modifies emails you explicitly select
-- **Protected Emails** - Starred, important, and labeled emails are automatically protected
-- **No Tracking** - No analytics or external data collection
 
 ## Contributing
 
@@ -190,15 +145,6 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-
-## Support
-
-If you encounter any issues or have questions:
-
-1. Check the [Issues](https://github.com/brianleungwh/gmail-cleaner/issues) page
-2. Create a new issue with detailed information
-3. Include logs and error messages when applicable
-
 ## Disclaimer
 
 This tool modifies your Gmail inbox. Always:
@@ -209,6 +155,3 @@ This tool modifies your Gmail inbox. Always:
 - Test with a small batch first
 
 **Use at your own risk. The authors are not responsible for any data loss.**
-
----
-

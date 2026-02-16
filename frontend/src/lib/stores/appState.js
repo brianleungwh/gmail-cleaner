@@ -2,8 +2,6 @@ import { writable, derived } from 'svelte/store';
 
 // Authentication state
 export const isAuthenticated = writable(false);
-export const credentialsPath = writable(null);
-export const uploadedCredentials = writable(null);
 
 // Collection state
 export const isCollecting = writable(false);

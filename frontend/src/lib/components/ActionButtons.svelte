@@ -6,18 +6,26 @@
     hasCollectedDomains,
     hasSelection,
     selectedDomains,
+    domains,
     excludedDomains,
     useLabelProtection,
     protectedLabelIds,
     addLog,
     showProgress,
     hideProgress,
-    showDomains
+    showDomains,
   } from '../stores/appState';
 
+  import { DomainCollector } from '../gmail/collector.js';
+  import { DomainCleaner } from '../gmail/cleaner.js';
+  import { createProgressHandler } from '../gmail/progressHandler.js';
+
   let collectBtnText = 'Scan Inbox';
-  let scanLimit = null;
   let scanLimitInput = '';
+
+  // Store the collector's thread data for cleanup to reference
+  let collectorThreadsById = {};
+  let collectorThreadsByDomain = {};
 
   async function collectDomains() {
     if ($isCollecting) return;
@@ -26,29 +34,40 @@
     showProgress();
     collectBtnText = 'Scanning...';
 
-    // Parse limit from input
     const limit = scanLimitInput ? parseInt(scanLimitInput, 10) : null;
 
+    const config = {
+      limit,
+      excludedDomains: new Set($excludedDomains),
+      useLabelProtection: $useLabelProtection,
+      protectedLabelIds: $protectedLabelIds ? new Set($protectedLabelIds) : null,
+    };
+
+    const progressHandler = createProgressHandler();
+    const collector = new DomainCollector(config, progressHandler);
+
     try {
-      const response = await fetch('/collect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          limit,
-          excluded_domains: $excludedDomains,
-          use_label_protection: $useLabelProtection,
-          protected_label_ids: $protectedLabelIds
-        })
-      });
+      const result = await collector.collect();
 
-      if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.detail || 'Collection failed');
-      }
+      // Store thread maps for cleanup
+      collectorThreadsById = collector.threadsById;
+      collectorThreadsByDomain = collector.threadsByDomain;
 
-      const result = await response.json();
+      // Sort by count descending and set domains
+      const sorted = Object.fromEntries(
+        Object.entries(result).sort(([, a], [, b]) => b.count - a.count)
+      );
+      $domains = Object.fromEntries(
+        Object.entries(sorted).map(([domain, info]) => [domain, {
+          count: info.count,
+          threads: info.threads,
+        }])
+      );
 
-      // Data will be handled via WebSocket messages
+      setTimeout(() => {
+        hideProgress();
+        showDomains();
+      }, 1000);
     } catch (error) {
       console.error('Collection error:', error);
       addLog(`Collection failed: ${error.message}`, 'error');
@@ -71,26 +90,31 @@
     $isCleaning = true;
     showProgress();
 
+    // Build the thread list from stored collector data
     const selectedDomainsArray = Array.from($selectedDomains);
+    const threads = [];
+    for (const domain of selectedDomainsArray) {
+      const threadIds = collectorThreadsByDomain[domain] || [];
+      for (const threadId of threadIds) {
+        const metadata = collectorThreadsById[threadId];
+        if (metadata) {
+          threads.push({
+            thread_id: threadId,
+            domain: metadata.domain,
+            subject: metadata.subject,
+            sender: metadata.sender,
+            message_count: metadata.messageCount,
+          });
+        }
+      }
+    }
+
+    const config = { dryRun, limit: null };
+    const progressHandler = createProgressHandler();
+    const cleaner = new DomainCleaner(config, progressHandler);
 
     try {
-      const response = await fetch('/cleanup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          domains: selectedDomainsArray,
-          dry_run: dryRun,
-          limit: null
-        })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.detail || 'Cleanup failed');
-      }
-
-      // Results will be handled via WebSocket messages
+      await cleaner.cleanup(threads);
     } catch (error) {
       addLog(`Cleanup failed: ${error.message}`, 'error');
       hideProgress();

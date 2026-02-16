@@ -6,6 +6,7 @@
     protectedLabelIds,
     availableLabels
   } from '../stores/appState';
+  import { listLabels } from '../gmail/api.js';
 
   let isExpanded = false;
   let domainInput = '';
@@ -36,18 +37,16 @@
     isLoadingLabels = true;
     labelsError = '';
     try {
-      const response = await fetch('/labels');
-      if (response.ok) {
-        const data = await response.json();
-        availableLabels.set(data.labels || []);
-        labelsLoaded = true;
-      } else {
-        const error = await response.json();
-        labelsError = error.detail || 'Failed to fetch labels';
-      }
+      const result = await listLabels();
+      const labels = (result.labels || [])
+        .filter(l => l.type === 'user')
+        .map(l => ({ id: l.id, name: l.name }))
+        .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+      availableLabels.set(labels);
+      labelsLoaded = true;
     } catch (error) {
       console.error('Failed to fetch labels:', error);
-      labelsError = 'Failed to connect to server';
+      labelsError = error.message || 'Failed to fetch labels';
     } finally {
       isLoadingLabels = false;
     }

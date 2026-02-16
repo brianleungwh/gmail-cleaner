@@ -7,29 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
-    name: Backend Tests
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    - name: Install uv
-      run: curl -LsSf https://astral.sh/uv/install.sh | sh
-
-    - name: Install dependencies
-      run: uv pip install --system -e ".[test]"
-
-    - name: Run tests
-      run: pytest tests/ -v
-
-  build:
-    name: Frontend Build
+  test-and-build:
+    name: Test & Build
     runs-on: ubuntu-latest
 
     steps:
@@ -46,6 +25,13 @@ jobs:
       working-directory: frontend
       run: npm ci
 
-    - name: Build frontend
+    - name: Run tests
       working-directory: frontend
+      run: npm test
+
+    - name: Build
+      working-directory: frontend
+      env:
+        VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID || 'test-client-id' }}
+        VITE_GOOGLE_API_KEY: ${{ vars.GOOGLE_API_KEY || 'test-api-key' }}
       run: npm run build

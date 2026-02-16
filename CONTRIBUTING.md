@@ -16,7 +16,7 @@ Before creating bug reports, please check the existing issues to avoid duplicate
 - **Describe the exact steps to reproduce the problem**
 - **Provide specific examples** (code snippets, screenshots, etc.)
 - **Describe the behavior you observed and what you expected**
-- **Include your environment details** (OS, Python version, Node version, browser)
+- **Include your environment details** (OS, Node version, browser)
 - **Include relevant logs and error messages**
 
 ### Suggesting Enhancements
@@ -42,10 +42,8 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 ### Prerequisites
 
-- Python 3.11+
 - Node.js 20+
-- uv (Python package manager)
-- Docker (optional)
+- A Google Cloud project with Gmail API enabled (see README for setup)
 
 ### Setting Up Your Development Environment
 
@@ -55,82 +53,28 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
    cd gmail-cleaner
    ```
 
-2. **Install backend dependencies**
-   ```bash
-   uv pip install -e .
-   ```
-
-3. **Install frontend dependencies**
+2. **Install dependencies**
    ```bash
    cd frontend
    npm install
    ```
 
-4. **Set up pre-commit hooks** (optional but recommended)
+3. **Configure environment**
    ```bash
-   # Install pre-commit
-   pip install pre-commit
-
-   # Install hooks
-   pre-commit install
+   cp .env.example .env
+   # Edit .env with your VITE_GOOGLE_CLIENT_ID and VITE_GOOGLE_API_KEY
    ```
 
-### Running the Development Environment
-
-1. **Start the backend**
+4. **Start the dev server**
    ```bash
-   uv run python -m uvicorn app.main:app --reload
-   ```
-
-2. **Start the frontend** (in a separate terminal)
-   ```bash
-   cd frontend
    npm run dev
    ```
 
-3. **Access the app**
-   - Frontend dev server: http://localhost:5173
-   - Backend API: http://localhost:8000
+5. **Access the app** at http://localhost:5173
 
 ## Coding Standards
 
-### Python (Backend)
-
-- Follow [PEP 8](https://www.python.org/dev/peps/pep-0008/) style guide
-- Use type hints for function arguments and return values
-- Use async/await for I/O operations
-- Write docstrings for classes and functions
-- Keep functions focused and small (single responsibility)
-
-**Example:**
-```python
-async def get_threads_batch(
-    self,
-    page_token: Optional[str] = None,
-    batch_size: int = 100
-) -> tuple[List[ThreadInfo], Optional[str]]:
-    """Fetch a batch of threads and their messages for processing.
-
-    Args:
-        page_token: Token for pagination
-        batch_size: Number of threads to fetch
-
-    Returns:
-        Tuple of (list of threads, next page token)
-    """
-    # Implementation...
-```
-
-**Code formatting:**
-```bash
-# Format code with black
-black app/
-
-# Lint with ruff
-ruff check app/
-```
-
-### JavaScript/Svelte (Frontend)
+### JavaScript/Svelte
 
 - Use ES6+ features
 - Use const/let instead of var
@@ -138,37 +82,6 @@ ruff check app/
 - Use Svelte stores for global state
 - Follow Svelte best practices
 - Use Tailwind utility classes for styling
-
-**Example:**
-```svelte
-<script>
-  import { someStore } from '../stores/appState';
-
-  export let domain;
-  export let info;
-
-  let expanded = false;
-
-  function toggleExpand() {
-    expanded = !expanded;
-  }
-</script>
-
-<div class="border rounded-lg p-4">
-  <!-- Component template -->
-</div>
-```
-
-**Code formatting:**
-```bash
-cd frontend
-
-# Format code with prettier (if configured)
-npm run format
-
-# Lint
-npm run lint
-```
 
 ### Commit Messages
 
@@ -183,85 +96,44 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 - `test:` - Adding or updating tests
 - `chore:` - Changes to build process or auxiliary tools
 
-**Examples:**
-```
-feat: add CSV export for domain lists
-fix: resolve WebSocket reconnection issue
-docs: update installation instructions
-refactor: simplify domain filtering logic
-```
-
 ## Testing
-
-### Backend Tests
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=app tests/
-
-# Run specific test file
-pytest tests/test_gmail_service.py
-```
-
-### Frontend Tests
 
 ```bash
 cd frontend
 
-# Run tests
+# Run all tests
 npm test
 
 # Run tests in watch mode
-npm test -- --watch
+npm run test:watch
 ```
-
-### Integration Tests
-
-```bash
-# Test the full stack
-docker-compose up --build
-# Test manually in browser or with E2E tests
-```
-
-## Documentation
-
-- Update README.md if adding new features
-- Add docstrings to new functions and classes
-- Update API documentation for new endpoints
-- Add comments for complex logic
-- Update frontend/README.md for frontend changes
 
 ## Project Structure
 
-Understanding the project structure will help you navigate the codebase:
-
 ```
 gmail-cleaner/
-├── app/                      # Backend
-│   ├── main.py              # FastAPI routes and app
-│   ├── gmail_service.py     # Gmail API logic
-│   └── static/              # Built frontend
-├── frontend/                # Frontend
+├── frontend/
 │   ├── src/
-│   │   ├── lib/
-│   │   │   ├── components/  # Svelte components
-│   │   │   └── stores/      # State management
-│   │   └── App.svelte       # Main component
-│   └── vite.config.js       # Build config
-├── tests/                   # Backend tests
-└── docker-compose.yml       # Docker config
+│   │   ├── App.svelte                  # Main app layout
+│   │   ├── main.js                     # Entry point
+│   │   └── lib/
+│   │       ├── gmail/                  # Gmail API modules
+│   │       │   ├── api.js              # gapi.client.gmail wrapper
+│   │       │   ├── auth.js             # GIS + gapi initialization
+│   │       │   ├── collector.js        # Domain collection logic
+│   │       │   ├── cleaner.js          # Email cleanup logic
+│   │       │   ├── progressHandler.js  # Progress -> store updates
+│   │       │   └── __tests__/          # Vitest unit tests
+│   │       ├── components/             # Svelte UI components
+│   │       └── stores/                 # Svelte stores
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.js
+├── .github/workflows/ci.yml
+├── README.md
+├── CONTRIBUTING.md
+└── LICENSE
 ```
-
-## Release Process
-
-1. Update version in `pyproject.toml` and `frontend/package.json`
-2. Update CHANGELOG.md
-3. Create a new GitHub release
-4. Tag the release with version number (e.g., `v1.0.0`)
-5. Build and push Docker image
 
 ## Questions?
 
@@ -270,11 +142,4 @@ Feel free to:
 - Join our community discussions
 - Reach out to maintainers
 
-## Recognition
-
-Contributors will be recognized in:
-- README.md contributors section
-- Release notes
-- GitHub contributors page
-
-Thank you for contributing! 🎉
+Thank you for contributing!

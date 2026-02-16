@@ -81,6 +81,7 @@ manager = ConnectionManager()
 # Progress callback for Gmail service
 async def progress_callback(message_type: str, data: Dict):
     """Forward Gmail service progress to WebSocket clients"""
+    logger.debug(f"Progress callback: {message_type} - {data}")
     await manager.broadcast(message_type, data)
 
 
@@ -103,25 +104,25 @@ class AuthRequest(BaseModel):
 
 
 @app.get("/", response_class=HTMLResponse)
-async def root():
+def root():
     """Serve the main application page"""
     return FileResponse("app/static/index.html")
 
 
 @app.get("/health")
-async def health_check():
+def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
 
 
 @app.get("/auth/status")
-async def check_auth_status():
+def check_auth_status():
     """Check if already authenticated"""
     from pathlib import Path
-    
+
     token_path = Path("data/token.json")
     creds_path = Path("data/credentials.json")
-    
+
     if token_path.exists():
         # Try to use existing token
         gmail_service.set_progress_callback(progress_callback)
@@ -130,7 +131,7 @@ async def check_auth_status():
                 "authenticated": True,
                 "credentials_path": str(creds_path.absolute()) if creds_path.exists() else None
             }
-    
+
     return {
         "authenticated": False,
         "credentials_path": str(creds_path.absolute()) if creds_path.exists() else None
@@ -138,11 +139,11 @@ async def check_auth_status():
 
 
 @app.post("/auth/upload")
-async def upload_credentials(credentials: dict):
+def upload_credentials(credentials: dict):
     """Handle uploaded credentials and start OAuth flow"""
     import json
     from pathlib import Path
-    
+
     try:
         logger.info("Received credentials upload request")
 
@@ -169,18 +170,18 @@ async def upload_credentials(credentials: dict):
 
 
 @app.get("/oauth/callback")
-async def oauth_callback(code: str = None, error: str = None):
+def oauth_callback(code: str = None, error: str = None):
     """Handle OAuth2 callback from Google"""
     if error:
         return RedirectResponse(url="/static/index.html?auth_error=" + error)
-    
+
     if not code:
         return RedirectResponse(url="/static/index.html?auth_error=no_code")
-    
+
     # Complete OAuth flow
     gmail_service.set_progress_callback(progress_callback)
     success = gmail_service.complete_oauth_flow(code)
-    
+
     if success:
         # Redirect to main page with success
         return RedirectResponse(url="/static/index.html?auth_success=true")
@@ -201,13 +202,7 @@ async def collect_domains(request: CollectRequest):
 
     try:
         logger.info(f"Starting domain collection with limit: {request.limit}...")
-        # Set up progress callback
-        # Create a wrapper to ensure compatibility
-        async def async_progress_callback(msg_type: str, data: Dict):
-            logger.debug(f"Progress callback: {msg_type} - {data}")
-            await manager.broadcast(msg_type, data)
-
-        gmail_service.set_progress_callback(async_progress_callback)
+        gmail_service.set_progress_callback(progress_callback)
 
         # Start collection with filtering options
         collected_domains = await gmail_service.collect_domains(
@@ -250,14 +245,7 @@ async def cleanup_emails(request: CleanupRequest):
         raise HTTPException(status_code=400, detail="Not authenticated. Please authenticate first.")
     
     try:
-        # Set up progress callback with async wrapper
-        async def async_progress_callback(msg_type: str, data: Dict):
-            logger.debug(f"Progress callback: {msg_type} - {data}")
-            await manager.broadcast(msg_type, data)
-
-        gmail_service.set_progress_callback(async_progress_callback)
-        
-        # Convert list to set
+        gmail_service.set_progress_callback(progress_callback)
         junk_domains = set(request.domains)
         
         # Start cleanup
@@ -278,7 +266,7 @@ async def cleanup_emails(request: CleanupRequest):
 
 
 @app.get("/labels")
-async def get_labels():
+def get_labels():
     """Get all custom Gmail labels for the authenticated user"""
     if not gmail_service.service:
         raise HTTPException(status_code=400, detail="Not authenticated. Please authenticate first.")
@@ -292,18 +280,18 @@ async def get_labels():
 
 
 @app.get("/domains")
-async def get_collected_domains():
+def get_collected_domains():
     """Get previously collected domains"""
     if not collected_domains:
         return {"domains": {}, "total_domains": 0}
-    
+
     # Sort domains by count (highest first)
     sorted_domains = dict(sorted(
-        collected_domains.items(), 
-        key=lambda x: x[1].count, 
+        collected_domains.items(),
+        key=lambda x: x[1].count,
         reverse=True
     ))
-    
+
     return {
         "domains": {
             domain: {

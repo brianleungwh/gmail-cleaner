@@ -19,19 +19,15 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+        cache-dependency-path: package-lock.json
 
     - name: Install dependencies
-      working-directory: frontend
       run: npm ci
 
     - name: Run tests
-      working-directory: frontend
       run: npm test
 
     - name: Build
-      working-directory: frontend
       env:
         VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID || 'test-client-id' }}
-        VITE_GOOGLE_API_KEY: ${{ vars.GOOGLE_API_KEY || 'test-api-key' }}
       run: npm run build

@@ -1,16 +1,15 @@
 # Dependencies
 node_modules/
-frontend/node_modules/
 
 # Build output
-frontend/dist/
+dist/
+dist-ssr/
 
 # Environment variables
 .env
 .env.local
 .env.*.local
-frontend/.env
-frontend/.env.local
+*.local
 
 # Credentials (should never be committed)
 credentials.json
@@ -28,17 +27,26 @@ ehthumbs.db
 Thumbs.db
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 *~
 
 # Logs
+logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 
 # Test coverage
 coverage/

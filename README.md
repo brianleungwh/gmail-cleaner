@@ -65,21 +65,18 @@ You need a Google Cloud project with the Gmail API enabled and an OAuth client c
 3. Navigate to "APIs & Services" > "Enable APIs and Services"
 4. Search for and enable **Gmail API**
 5. Go to "APIs & Services" > "Credentials"
-6. Click "Create Credentials" > **API key** - note this key
-7. Click "Create Credentials" > **OAuth client ID**
+6. Click "Create Credentials" > **OAuth client ID**
    - Application type: **Web application**
    - Authorized JavaScript origins: `http://localhost:5173` (for dev)
    - Authorized redirect URIs: `http://localhost:5173` (for dev)
-8. Note the **Client ID**
+7. Note the **Client ID**
 
 ### Install & Run
 
 ```bash
-cd frontend
-
 # Create .env file with your credentials
 cp .env.example .env
-# Edit .env with your VITE_GOOGLE_CLIENT_ID and VITE_GOOGLE_API_KEY
+# Edit .env with your VITE_GOOGLE_CLIENT_ID
 
 # Install dependencies
 npm install
@@ -93,18 +90,16 @@ The app will be available at http://localhost:5173
 ### Run Tests
 
 ```bash
-cd frontend
 npm test
 ```
 
 ### Build for Production
 
 ```bash
-cd frontend
 npm run build
 ```
 
-The built files will be in `frontend/dist/`. Deploy to any static host (GitHub Pages, Netlify, Vercel, etc.).
+The built files will be in `dist/`. Deploy to any static host (GitHub Pages, Netlify, Vercel, etc.).
 
 When deploying, add your production URL to the OAuth client's authorized JavaScript origins and redirect URIs.
 
@@ -112,23 +107,22 @@ When deploying, add your production URL to the OAuth client's authorized JavaScr
 
 ```
 gmail-cleaner/
-├── frontend/
-│   ├── src/
-│   │   ├── App.svelte                  # Main app component
-│   │   ├── main.js                     # Entry point
-│   │   └── lib/
-│   │       ├── gmail/                  # Gmail API modules
-│   │       │   ├── api.js              # Gmail REST API wrapper (via gapi)
-│   │       │   ├── auth.js             # GIS OAuth + gapi initialization
-│   │       │   ├── collector.js        # Domain scanning logic
-│   │       │   ├── cleaner.js          # Email cleanup logic
-│   │       │   ├── progressHandler.js  # Progress event -> store updates
-│   │       │   └── __tests__/          # Vitest tests
-│   │       ├── components/             # Svelte UI components
-│   │       └── stores/                 # Svelte stores (state)
-│   ├── index.html
-│   ├── package.json
-│   └── vite.config.js
+├── src/
+│   ├── App.svelte                      # Main app component
+│   ├── main.js                         # Entry point
+│   └── lib/
+│       ├── gmail/                      # Gmail API modules
+│       │   ├── api.js                  # Gmail REST API wrapper (via gapi)
+│       │   ├── auth.js                 # GIS OAuth + gapi initialization
+│       │   ├── collector.js            # Domain scanning logic
+│       │   ├── cleaner.js              # Email cleanup logic
+│       │   ├── progressHandler.js      # Progress event -> store updates
+│       │   └── __tests__/              # Vitest tests
+│       ├── components/                 # Svelte UI components
+│       └── stores/                     # Svelte stores (state)
+├── index.html
+├── package.json
+├── vite.config.js
 ├── .github/workflows/                  # CI pipeline
 ├── README.md
 ├── CONTRIBUTING.md

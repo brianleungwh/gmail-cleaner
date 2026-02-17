@@ -25,9 +25,7 @@ If applicable, add screenshots to help explain your problem.
 ## Environment
 - OS: [e.g. macOS, Ubuntu, Windows]
 - Browser: [e.g. Chrome, Safari, Firefox]
-- Python Version: [e.g. 3.11.5]
 - Node Version: [e.g. 20.10.0]
-- Docker Version (if applicable): [e.g. 24.0.6]
 
 ## Logs
 Please include relevant error logs:

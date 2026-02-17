@@ -24,9 +24,7 @@ Related to #(issue number)
 
 ## Testing
 <!-- Describe the tests you ran and their results -->
-- [ ] Tested locally with backend server
-- [ ] Tested locally with frontend dev server
-- [ ] Tested with Docker
+- [ ] Tested locally with dev server
 - [ ] Added/updated unit tests
 - [ ] All existing tests pass
 

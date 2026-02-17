@@ -55,14 +55,13 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 2. **Install dependencies**
    ```bash
-   cd frontend
    npm install
    ```
 
 3. **Configure environment**
    ```bash
    cp .env.example .env
-   # Edit .env with your VITE_GOOGLE_CLIENT_ID and VITE_GOOGLE_API_KEY
+   # Edit .env with your VITE_GOOGLE_CLIENT_ID
    ```
 
 4. **Start the dev server**
@@ -99,8 +98,6 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 ## Testing
 
 ```bash
-cd frontend
-
 # Run all tests
 npm test
 
@@ -112,23 +109,22 @@ npm run test:watch
 
 ```
 gmail-cleaner/
-├── frontend/
-│   ├── src/
-│   │   ├── App.svelte                  # Main app layout
-│   │   ├── main.js                     # Entry point
-│   │   └── lib/
-│   │       ├── gmail/                  # Gmail API modules
-│   │       │   ├── api.js              # gapi.client.gmail wrapper
-│   │       │   ├── auth.js             # GIS + gapi initialization
-│   │       │   ├── collector.js        # Domain collection logic
-│   │       │   ├── cleaner.js          # Email cleanup logic
-│   │       │   ├── progressHandler.js  # Progress -> store updates
-│   │       │   └── __tests__/          # Vitest unit tests
-│   │       ├── components/             # Svelte UI components
-│   │       └── stores/                 # Svelte stores
-│   ├── index.html
-│   ├── package.json
-│   └── vite.config.js
+├── src/
+│   ├── App.svelte                      # Main app layout
+│   ├── main.js                         # Entry point
+│   └── lib/
+│       ├── gmail/                      # Gmail API modules
+│       │   ├── api.js                  # gapi.client.gmail wrapper
+│       │   ├── auth.js                 # GIS + gapi initialization
+│       │   ├── collector.js            # Domain collection logic
+│       │   ├── cleaner.js              # Email cleanup logic
+│       │   ├── progressHandler.js      # Progress -> store updates
+│       │   └── __tests__/              # Vitest unit tests
+│       ├── components/                 # Svelte UI components
+│       └── stores/                     # Svelte stores
+├── index.html
+├── package.json
+├── vite.config.js
 ├── .github/workflows/ci.yml
 ├── README.md
 ├── CONTRIBUTING.md

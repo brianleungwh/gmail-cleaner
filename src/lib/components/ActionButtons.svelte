@@ -1,31 +1,19 @@
 <script>
-  import {
-    isAuthenticated,
-    isCollecting,
-    isCleaning,
-    hasCollectedDomains,
-    hasSelection,
-    selectedDomains,
-    domains,
-    excludedDomains,
-    useLabelProtection,
-    protectedLabelIds,
-    addLog,
-    showProgress,
-    hideProgress,
-    showDomains,
-  } from '../stores/appState';
+  import { isAuthenticated } from '../stores/authStore.js';
+  import { isCollecting, domains, collectionResult, hasCollectedDomains } from '../stores/collectionStore.js';
+  import { isCleaning, hasSelection, selectedDomains } from '../stores/cleanupStore.js';
+  import { addLog } from '../stores/progressStore.js';
+  import { excludedDomains, useLabelProtection, protectedLabelIds } from '../stores/filterStore.js';
+  import { showProgress, hideProgress, showDomains } from '../stores/uiStore.js';
 
+  import { CollectorConfig, CleanerConfig } from '../models/index.js';
   import { DomainCollector } from '../gmail/collector.js';
   import { DomainCleaner } from '../gmail/cleaner.js';
   import { createProgressHandler } from '../gmail/progressHandler.js';
+  import { getErrorMessage } from '../errors.js';
 
   let collectBtnText = 'Scan Inbox';
   let scanLimitInput = '';
-
-  // Store the collector's thread data for cleanup to reference
-  let collectorThreadsById = {};
-  let collectorThreadsByDomain = {};
 
   async function collectDomains() {
     if ($isCollecting) return;
@@ -36,12 +24,12 @@
 
     const limit = scanLimitInput ? parseInt(scanLimitInput, 10) : null;
 
-    const config = {
+    const config = new CollectorConfig({
       limit,
       excludedDomains: new Set($excludedDomains),
       useLabelProtection: $useLabelProtection,
       protectedLabelIds: $protectedLabelIds ? new Set($protectedLabelIds) : null,
-    };
+    });
 
     const progressHandler = createProgressHandler();
     const collector = new DomainCollector(config, progressHandler);
@@ -49,20 +37,8 @@
     try {
       const result = await collector.collect();
 
-      // Store thread maps for cleanup
-      collectorThreadsById = collector.threadsById;
-      collectorThreadsByDomain = collector.threadsByDomain;
-
-      // Sort by count descending and set domains
-      const sorted = Object.fromEntries(
-        Object.entries(result).sort(([, a], [, b]) => b.count - a.count)
-      );
-      $domains = Object.fromEntries(
-        Object.entries(sorted).map(([domain, info]) => [domain, {
-          count: info.count,
-          threads: info.threads,
-        }])
-      );
+      $collectionResult = result;
+      $domains = result.getSortedDomainMap();
 
       setTimeout(() => {
         hideProgress();
@@ -70,7 +46,7 @@
       }, 1000);
     } catch (error) {
       console.error('Collection error:', error);
-      addLog(`Collection failed: ${error.message}`, 'error');
+      addLog(`Collection failed: ${getErrorMessage(error)}`, 'error');
       hideProgress();
     } finally {
       $isCollecting = false;
@@ -90,33 +66,16 @@
     $isCleaning = true;
     showProgress();
 
-    // Build the thread list from stored collector data
-    const selectedDomainsArray = Array.from($selectedDomains);
-    const threads = [];
-    for (const domain of selectedDomainsArray) {
-      const threadIds = collectorThreadsByDomain[domain] || [];
-      for (const threadId of threadIds) {
-        const metadata = collectorThreadsById[threadId];
-        if (metadata) {
-          threads.push({
-            thread_id: threadId,
-            domain: metadata.domain,
-            subject: metadata.subject,
-            sender: metadata.sender,
-            message_count: metadata.messageCount,
-          });
-        }
-      }
-    }
+    const threads = $collectionResult.getCleanupThreads($selectedDomains);
 
-    const config = { dryRun, limit: null };
+    const config = new CleanerConfig({ dryRun });
     const progressHandler = createProgressHandler();
     const cleaner = new DomainCleaner(config, progressHandler);
 
     try {
       await cleaner.cleanup(threads);
     } catch (error) {
-      addLog(`Cleanup failed: ${error.message}`, 'error');
+      addLog(`Cleanup failed: ${getErrorMessage(error)}`, 'error');
       hideProgress();
     } finally {
       $isCleaning = false;

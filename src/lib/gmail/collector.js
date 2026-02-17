@@ -1,10 +1,15 @@
 /**
  * Domain Collector - Handles domain collection from Gmail inbox
- *
- * Port of app/collector.py
  */
 
 import { getInboxInfo, listThreads, getThread } from './api.js';
+import { ThreadsList, Thread, CleanupThread, DomainResult, CollectionResult } from '../models/index.js';
+import {
+  SUBJECT_TRUNCATE_COLLECTOR,
+  UI_YIELD_INTERVAL,
+  THREAD_PAGE_SIZE,
+} from '../constants.js';
+import { getErrorMessage } from '../errors.js';
 
 export class DomainCollector {
   constructor(config, progressCallback = null) {
@@ -12,7 +17,7 @@ export class DomainCollector {
     this.progressCallback = progressCallback;
 
     // Results - exposed for cleanup to access
-    this.threadsById = {};      // threadId -> ThreadMetadata
+    this.threadsById = {};      // threadId -> Thread
     this.threadsByDomain = {};  // domain -> [threadId, ...]
     this.interrupted = false;
   }
@@ -39,56 +44,48 @@ export class DomainCollector {
     this.threadsById = {};
     this.threadsByDomain = {};
 
-    const domainData = {}; // domain -> { count, subjects[] }
+    const domainCounts = {}; // domain -> count
     let pageToken = null;
     let totalThreads = 0;
 
     while (!this.interrupted) {
       try {
-        const { threads, nextPageToken } = await this._fetchThreadPage(pageToken);
+        const page = await this._fetchThreadPage(pageToken);
 
-        if (!threads || threads.length === 0) {
+        if (page.threadIds.length === 0) {
           break;
         }
 
-        for (const thread of threads) {
+        for (const threadId of page.threadIds) {
           if (this.interrupted) break;
 
-          const threadId = thread.id;
-          const metadata = await this._getThreadMetadata(threadId);
+          const thread = await this._getThread(threadId);
 
-          if (metadata === null) continue;
-          if (!this._shouldInclude(metadata)) continue;
+          if (thread === null) continue;
+          if (!this._shouldInclude(thread)) continue;
 
           // Store thread
-          this._storeThread(metadata);
+          this._storeThread(thread);
 
-          // Update domain data
-          if (!domainData[metadata.domain]) {
-            domainData[metadata.domain] = { count: 0, subjects: [] };
-          }
-          domainData[metadata.domain].count += 1;
-          if (
-            !domainData[metadata.domain].subjects.includes(metadata.subject) &&
-            domainData[metadata.domain].subjects.length < 3
-          ) {
-            domainData[metadata.domain].subjects.push(metadata.subject);
-          }
+          // Track domain count
+          const domain = thread.getDomain();
+          domainCounts[domain] = (domainCounts[domain] || 0) + 1;
 
           totalThreads += 1;
 
           // Send progress update
-          const truncatedSubject = metadata.subject.length > 60
-            ? metadata.subject.slice(0, 60) + '...'
-            : metadata.subject;
+          const subject = thread.getSubject();
+          const truncatedSubject = subject.length > SUBJECT_TRUNCATE_COLLECTOR
+            ? subject.slice(0, SUBJECT_TRUNCATE_COLLECTOR) + '...'
+            : subject;
 
           await this._reportProgress('thread_processed', {
             thread_id: threadId,
-            domain: metadata.domain,
+            domain,
             subject: truncatedSubject,
             processed_threads: totalThreads,
             total_threads: effectiveTotal,
-            unique_domains: Object.keys(domainData).length,
+            unique_domains: Object.keys(domainCounts).length,
           });
 
           // Check limit
@@ -96,8 +93,8 @@ export class DomainCollector {
             break;
           }
 
-          // Yield control every 10 threads to let UI update
-          if (totalThreads % 10 === 0) {
+          // Yield control periodically to let UI update
+          if (totalThreads % UI_YIELD_INTERVAL === 0) {
             await new Promise((r) => setTimeout(r, 0));
           }
         }
@@ -107,25 +104,25 @@ export class DomainCollector {
           break;
         }
 
-        pageToken = nextPageToken;
+        pageToken = page.nextPageToken;
         if (!pageToken) break;
       } catch (error) {
         await this._reportProgress('error', {
-          message: `Error fetching threads: ${error.message || error}`,
+          message: `Error fetching threads: ${getErrorMessage(error)}`,
         });
         break;
       }
     }
 
     // Build results
-    const result = this._buildResults(domainData);
+    const result = this._buildResults(domainCounts);
 
     const limitMsg = this.config.limit ? ` (limited to ${this.config.limit})` : '';
     await this._reportProgress('collection_completed', {
       processed_threads: totalThreads,
       total_threads: effectiveTotal,
-      unique_domains: Object.keys(result).length,
-      message: `Collection complete${limitMsg}: ${totalThreads.toLocaleString()} threads processed, ${Object.keys(result).length.toLocaleString()} unique domains`,
+      unique_domains: Object.keys(result.domainResults).length,
+      message: `Collection complete${limitMsg}: ${totalThreads.toLocaleString()} threads processed, ${Object.keys(result.domainResults).length.toLocaleString()} unique domains`,
     });
 
     return result;
@@ -144,53 +141,25 @@ export class DomainCollector {
   }
 
   async _fetchThreadPage(pageToken) {
-    const result = await listThreads({
-      maxResults: 100,
+    const raw = await listThreads({
+      maxResults: THREAD_PAGE_SIZE,
       pageToken,
       q: 'in:inbox',
     });
 
-    return {
-      threads: result.threads || [],
-      nextPageToken: result.nextPageToken || null,
-    };
+    return new ThreadsList(raw);
   }
 
-  async _getThreadMetadata(threadId) {
-    const threadData = await getThread(threadId, {
+  async _getThread(threadId) {
+    const raw = await getThread(threadId, {
       format: 'metadata',
       metadataHeaders: ['From', 'Subject'],
     });
 
-    const messages = threadData.messages || [];
-    if (messages.length === 0) return null;
+    const thread = new Thread(threadId, raw);
+    if (thread.isEmpty() || !thread.getDomain()) return null;
 
-    const firstMessage = messages[0];
-    const headers = {};
-    for (const h of (firstMessage.payload?.headers || [])) {
-      headers[h.name] = h.value;
-    }
-
-    const sender = headers['From'] || '(Unknown Sender)';
-    const subject = headers['Subject'] || '(No Subject)';
-    const senderEmail = DomainCollector.extractEmailAddress(sender);
-
-    // Get labels from both thread and message level
-    const threadLabelIds = threadData.labelIds || [];
-    const firstMessageLabelIds = firstMessage.labelIds || [];
-    const allLabelIds = [...new Set([...threadLabelIds, ...firstMessageLabelIds])];
-
-    const domain = DomainCollector.extractDomain(senderEmail);
-    if (!domain) return null;
-
-    return {
-      threadId,
-      domain,
-      subject,
-      sender: senderEmail,
-      messageCount: messages.length,
-      labelIds: allLabelIds,
-    };
+    return thread;
   }
 
   // === Filtering ===
@@ -223,51 +192,39 @@ export class DomainCollector {
     return this.config.excludedDomains.has(domain);
   }
 
-  _shouldInclude(metadata) {
-    if (this._isProtected(metadata.labelIds)) return false;
-    if (this._isExcluded(metadata.domain)) return false;
+  _shouldInclude(thread) {
+    if (this._isProtected(thread.getLabelIds())) return false;
+    if (this._isExcluded(thread.getDomain())) return false;
     return true;
   }
 
   // === Storage ===
 
-  _storeThread(metadata) {
-    this.threadsById[metadata.threadId] = metadata;
-    if (!this.threadsByDomain[metadata.domain]) {
-      this.threadsByDomain[metadata.domain] = [];
+  _storeThread(thread) {
+    const domain = thread.getDomain();
+    this.threadsById[thread.threadId] = thread;
+    if (!this.threadsByDomain[domain]) {
+      this.threadsByDomain[domain] = [];
     }
-    this.threadsByDomain[metadata.domain].push(metadata.threadId);
+    this.threadsByDomain[domain].push(thread.threadId);
   }
 
   // === Results ===
 
-  _buildResults(domainData) {
-    const result = {};
+  _buildResults(domainCounts) {
+    const domainResults = {};
 
-    for (const [domain, data] of Object.entries(domainData)) {
+    for (const [domain, count] of Object.entries(domainCounts)) {
       const threadIds = this.threadsByDomain[domain] || [];
-      const threads = [];
+      const threads = threadIds
+        .map((id) => this.threadsById[id])
+        .filter(Boolean)
+        .map((thread) => CleanupThread.fromThread(thread));
 
-      for (const threadId of threadIds) {
-        const metadata = this.threadsById[threadId];
-        if (metadata) {
-          threads.push({
-            thread_id: threadId,
-            subject: metadata.subject,
-            sender: metadata.sender,
-            message_count: metadata.messageCount,
-          });
-        }
-      }
-
-      result[domain] = {
-        domain,
-        count: data.count,
-        threads,
-      };
+      domainResults[domain] = new DomainResult({ domain, count, threads });
     }
 
-    return result;
+    return new CollectionResult(domainResults, this.threadsById, this.threadsByDomain);
   }
 
   // === Progress ===
@@ -278,18 +235,4 @@ export class DomainCollector {
     }
   }
 
-  // === Utilities ===
-
-  static extractEmailAddress(sender) {
-    const match = sender.match(/<([^>]+)>/);
-    if (match) return match[1].toLowerCase();
-    return sender.trim().toLowerCase();
-  }
-
-  static extractDomain(email) {
-    if (email.includes('@')) {
-      return email.split('@')[1].toLowerCase();
-    }
-    return '';
-  }
 }

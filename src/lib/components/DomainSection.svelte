@@ -1,5 +1,7 @@
 <script>
-  import { domainsVisible, domains, selectedDomains, selectedCount } from '../stores/appState';
+  import { domains } from '../stores/collectionStore.js';
+  import { selectedDomains, selectedCount } from '../stores/cleanupStore.js';
+  import { domainsVisible } from '../stores/uiStore.js';
   import DomainItem from './DomainItem.svelte';
 
   let searchQuery = '';

@@ -1,12 +1,9 @@
 /**
  * Test utilities for Gmail modules
- *
- * Port of tests/conftest.py
  */
 
 /**
  * Create a thread dict matching Gmail API structure.
- * Equivalent to conftest.py make_thread()
  */
 export function makeThread(threadId, sender, subject, labels = ['INBOX'], messageCount = 1) {
   const messages = [];
@@ -62,7 +59,6 @@ export function makeThreadNoFromHeader(threadId, subject) {
 
 /**
  * Returns a realistic inbox data structure with various thread types.
- * Equivalent to conftest.py sample_inbox fixture.
  */
 export function sampleInbox() {
   const threads = [
@@ -95,9 +91,6 @@ export function sampleInbox() {
 
 /**
  * Create mock implementations for the api.js module functions.
- *
- * Returns an object with mock functions that simulate Gmail API responses,
- * matching the behavior of conftest.py's MockGmailService hierarchy.
  *
  * @param {object} inboxData - The inbox data from sampleInbox() or similar
  * @param {object} options - Options like { failThreads: new Set(['thread_001']) }
@@ -154,4 +147,26 @@ export function createApiMocks(inboxData, { failThreads = new Set() } = {}) {
       return { id: threadId, labelIds: ['TRASH'] };
     },
   };
+}
+
+/**
+ * Wire vi.fn() mocks from a vi.mock()'d api module to createApiMocks implementations.
+ *
+ * Note: vi.mock() calls must remain per-file due to Vitest hoisting. This helper only
+ * replaces the repetitive mockImplementation wiring, not the vi.mock() declaration.
+ *
+ * @param {object} api - The mocked api module (import * as api from '../api.js')
+ * @param {object} inboxData - Inbox data from sampleInbox() or similar
+ * @param {object} options - Options passed to createApiMocks
+ * @returns {object} The mocks object (with trashedThreads etc.)
+ */
+export function setupApiMocks(api, inboxData, options) {
+  const mocks = createApiMocks(inboxData, options);
+
+  api.getInboxInfo.mockImplementation(mocks.getInboxInfo);
+  api.listThreads.mockImplementation(mocks.listThreads);
+  api.getThread.mockImplementation(mocks.getThread);
+  api.trashThread.mockImplementation(mocks.trashThread);
+
+  return mocks;
 }

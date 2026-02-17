@@ -1,5 +1,5 @@
 <script>
-  import { selectedDomains, expandedDomains } from '../stores/appState';
+  import { selectedDomains, expandedDomains } from '../stores/cleanupStore.js';
 
   export let domain;
   export let info;

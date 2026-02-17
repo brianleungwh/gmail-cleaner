@@ -1,10 +1,10 @@
 /**
  * Domain Cleaner - Handles email cleanup for selected domains
- *
- * Port of app/cleaner.py
  */
 
 import { trashThread } from './api.js';
+import { CleanupStats } from '../models/index.js';
+import { SUBJECT_TRUNCATE_CLEANER } from '../constants.js';
 
 export class DomainCleaner {
   constructor(config, progressCallback = null) {
@@ -36,8 +36,8 @@ export class DomainCleaner {
 
       const { thread_id, domain, subject, sender, message_count } = thread;
 
-      const truncatedSubject = subject.length > 50
-        ? subject.slice(0, 50) + '...'
+      const truncatedSubject = subject.length > SUBJECT_TRUNCATE_CLEANER
+        ? subject.slice(0, SUBJECT_TRUNCATE_CLEANER) + '...'
         : subject;
 
       // Log what we're analyzing
@@ -111,11 +111,11 @@ export class DomainCleaner {
   // === Results ===
 
   static buildStats(processed, deleted, messagesDeleted, kept) {
-    return {
+    return new CleanupStats({
       threads_processed: processed,
       threads_deleted: deleted,
       messages_deleted: messagesDeleted,
       messages_kept: kept,
-    };
+    });
   }
 }

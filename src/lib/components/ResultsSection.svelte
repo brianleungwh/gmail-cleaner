@@ -1,5 +1,5 @@
 <script>
-  import { resultsVisible, resultsData } from '../stores/appState';
+  import { resultsVisible, resultsData } from '../stores/resultsStore.js';
 </script>
 
 {#if $resultsVisible && $resultsData}

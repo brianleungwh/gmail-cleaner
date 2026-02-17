@@ -1,0 +1,23 @@
+<script>
+  import Header from './lib/components/Header.svelte';
+  import AuthSection from './lib/components/AuthSection.svelte';
+  import FilterOptions from './lib/components/FilterOptions.svelte';
+  import ActionButtons from './lib/components/ActionButtons.svelte';
+  import ProgressSection from './lib/components/ProgressSection.svelte';
+  import DomainSection from './lib/components/DomainSection.svelte';
+  import ResultsSection from './lib/components/ResultsSection.svelte';
+</script>
+
+<div class="min-h-screen bg-gray-100">
+  <div class="container mx-auto px-4 py-8 max-w-5xl">
+    <Header />
+    <div class="space-y-4">
+      <AuthSection />
+      <FilterOptions />
+      <ActionButtons />
+      <ProgressSection />
+      <DomainSection />
+      <ResultsSection />
+    </div>
+  </div>
+</div>

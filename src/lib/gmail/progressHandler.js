@@ -1,18 +1,10 @@
 /**
  * Progress Handler - Creates callbacks that update Svelte stores
- *
- * Extracted from App.svelte's WebSocket message handlers.
  */
 
-import {
-  totalThreads,
-  progressPercent,
-  progressText,
-  progressIndeterminate,
-  addLog,
-  hideProgress,
-  showResults,
-} from '../stores/appState';
+import { totalThreads } from '../stores/collectionStore.js';
+import { progressPercent, progressText, progressIndeterminate, addLog } from '../stores/progressStore.js';
+import { hideProgress, showResults } from '../stores/uiStore.js';
 
 /**
  * Creates a progress callback function for use with DomainCollector and DomainCleaner.

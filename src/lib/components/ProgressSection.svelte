@@ -1,5 +1,5 @@
 <script>
-  import { progressVisible, progressPercent, progressText, progressIndeterminate, logs } from '../stores/appState';
+  import { progressVisible, progressPercent, progressText, progressIndeterminate, logs } from '../stores/progressStore.js';
   import { onMount, afterUpdate } from 'svelte';
 
   let logBoxElement;

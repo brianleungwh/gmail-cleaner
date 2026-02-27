@@ -139,16 +139,3 @@ export function revokeToken() {
   });
 }
 
-/**
- * Check if a valid token is currently set.
- */
-export function isTokenValid() {
-  return typeof gapi !== 'undefined' && gapi.client && gapi.client.getToken() !== null;
-}
-
-/**
- * Check if both libraries are initialized and ready.
- */
-export function isReady() {
-  return gapiInited && gisInited;
-}

@@ -1,12 +1,11 @@
 /**
  * Tests for DomainCleaner class
- *
- * Port of tests/test_cleaner.py
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DomainCleaner } from '../cleaner.js';
-import { createApiMocks, sampleInbox } from './testUtils.js';
+import { CleanerConfig } from '../../models/index.js';
+import { sampleInbox, createApiMocks, setupApiMocks } from './testUtils.js';
 
 // Top-level mock with vi.fn() stubs — hoisted safely
 vi.mock('../api.js', () => ({
@@ -46,16 +45,11 @@ let currentMocks;
 describe('cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    currentMocks = createApiMocks(sampleInbox());
-
-    api.getInboxInfo.mockImplementation(currentMocks.getInboxInfo);
-    api.listThreads.mockImplementation(currentMocks.listThreads);
-    api.getThread.mockImplementation(currentMocks.getThread);
-    api.trashThread.mockImplementation(currentMocks.trashThread);
+    currentMocks = setupApiMocks(api, sampleInbox());
   });
 
   it('dry run reports deletions without actually trashing', async () => {
-    const cleaner = new DomainCleaner({ dryRun: true, limit: null });
+    const cleaner = new DomainCleaner(new CleanerConfig({ dryRun: true }));
     const result = await cleaner.cleanup(sampleThreads());
 
     // Should report all threads as deleted
@@ -68,7 +62,7 @@ describe('cleanup', () => {
   });
 
   it('live run actually trashes threads', async () => {
-    const cleaner = new DomainCleaner({ dryRun: false, limit: null });
+    const cleaner = new DomainCleaner(new CleanerConfig({ dryRun: false }));
     const result = await cleaner.cleanup(sampleThreads());
 
     // Should report all threads as deleted
@@ -84,7 +78,7 @@ describe('cleanup', () => {
   });
 
   it('empty thread list returns zero stats', async () => {
-    const cleaner = new DomainCleaner({ dryRun: true, limit: null });
+    const cleaner = new DomainCleaner(new CleanerConfig({ dryRun: true }));
     const result = await cleaner.cleanup([]);
 
     expect(result.threads_processed).toBe(0);
@@ -94,11 +88,9 @@ describe('cleanup', () => {
   });
 
   it('handles trash error gracefully', async () => {
-    const failMocks = createApiMocks(sampleInbox(), { failThreads: new Set(['thread_001']) });
-    api.trashThread.mockImplementation(failMocks.trashThread);
-    currentMocks = failMocks;
+    currentMocks = setupApiMocks(api, sampleInbox(), { failThreads: new Set(['thread_001']) });
 
-    const cleaner = new DomainCleaner({ dryRun: false, limit: null });
+    const cleaner = new DomainCleaner(new CleanerConfig({ dryRun: false }));
     const result = await cleaner.cleanup(sampleThreads());
 
     // All threads processed
@@ -114,7 +106,7 @@ describe('cleanup', () => {
     const progressEvents = [];
     const callback = async (event, data) => progressEvents.push([event, data]);
 
-    const cleaner = new DomainCleaner({ dryRun: true, limit: null }, callback);
+    const cleaner = new DomainCleaner(new CleanerConfig({ dryRun: true }), callback);
     await cleaner.cleanup(sampleThreads());
 
     const eventTypes = progressEvents.map(e => e[0]);
@@ -128,7 +120,7 @@ describe('cleanup', () => {
     const progressEvents = [];
     const callback = async (event, data) => progressEvents.push([event, data]);
 
-    const cleaner = new DomainCleaner({ dryRun: false, limit: null }, callback);
+    const cleaner = new DomainCleaner(new CleanerConfig({ dryRun: false }), callback);
     await cleaner.cleanup(sampleThreads());
 
     const eventTypes = progressEvents.map(e => e[0]);
@@ -164,16 +156,11 @@ describe('buildStats', () => {
 describe('interrupt handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    const mocks = createApiMocks(sampleInbox());
-
-    api.getInboxInfo.mockImplementation(mocks.getInboxInfo);
-    api.listThreads.mockImplementation(mocks.listThreads);
-    api.getThread.mockImplementation(mocks.getThread);
-    api.trashThread.mockImplementation(mocks.trashThread);
+    setupApiMocks(api, sampleInbox());
   });
 
   it('stops when interrupted flag is set', async () => {
-    const cleaner = new DomainCleaner({ dryRun: true, limit: null });
+    const cleaner = new DomainCleaner(new CleanerConfig({ dryRun: true }));
 
     let processedCount = 0;
     cleaner.progressCallback = async (event) => {

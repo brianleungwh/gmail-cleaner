@@ -1,12 +1,11 @@
 /**
  * Tests for DomainCollector class
- *
- * Port of tests/test_collector.py
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DomainCollector } from '../collector.js';
-import { sampleInbox, createApiMocks } from './testUtils.js';
+import { CollectorConfig, Thread } from '../../models/index.js';
+import { sampleInbox, createApiMocks, setupApiMocks } from './testUtils.js';
 
 // Top-level mock with vi.fn() stubs — hoisted safely
 vi.mock('../api.js', () => ({
@@ -22,54 +21,54 @@ import * as api from '../api.js';
 
 describe('extractEmailAddress', () => {
   it('extracts email from Name <email> format', () => {
-    const result = DomainCollector.extractEmailAddress('John Doe <john@example.com>');
+    const result = Thread.extractEmailAddress('John Doe <john@example.com>');
     expect(result).toBe('john@example.com');
   });
 
   it('handles plain email', () => {
-    const result = DomainCollector.extractEmailAddress('john@example.com');
+    const result = Thread.extractEmailAddress('john@example.com');
     expect(result).toBe('john@example.com');
   });
 
   it('normalizes to lowercase', () => {
-    const result = DomainCollector.extractEmailAddress('John@EXAMPLE.COM');
+    const result = Thread.extractEmailAddress('John@EXAMPLE.COM');
     expect(result).toBe('john@example.com');
   });
 
   it('handles whitespace around email', () => {
-    const result = DomainCollector.extractEmailAddress('  john@example.com  ');
+    const result = Thread.extractEmailAddress('  john@example.com  ');
     expect(result).toBe('john@example.com');
   });
 
   it('handles complex display names', () => {
-    const result = DomainCollector.extractEmailAddress('"Doe, John" <john@example.com>');
+    const result = Thread.extractEmailAddress('"Doe, John" <john@example.com>');
     expect(result).toBe('john@example.com');
   });
 });
 
 describe('extractDomain', () => {
   it('extracts domain from simple email', () => {
-    const result = DomainCollector.extractDomain('john@example.com');
+    const result = Thread.extractDomain('john@example.com');
     expect(result).toBe('example.com');
   });
 
   it('extracts domain including subdomain', () => {
-    const result = DomainCollector.extractDomain('john@mail.example.com');
+    const result = Thread.extractDomain('john@mail.example.com');
     expect(result).toBe('mail.example.com');
   });
 
   it('normalizes domain to lowercase', () => {
-    const result = DomainCollector.extractDomain('john@EXAMPLE.COM');
+    const result = Thread.extractDomain('john@EXAMPLE.COM');
     expect(result).toBe('example.com');
   });
 
   it('returns empty string if no @ symbol', () => {
-    const result = DomainCollector.extractDomain('invalid');
+    const result = Thread.extractDomain('invalid');
     expect(result).toBe('');
   });
 
   it('handles empty string', () => {
-    const result = DomainCollector.extractDomain('');
+    const result = Thread.extractDomain('');
     expect(result).toBe('');
   });
 });
@@ -78,14 +77,7 @@ describe('extractDomain', () => {
 
 describe('isProtected', () => {
   function makeCollector(configOverrides = {}) {
-    const config = {
-      limit: null,
-      excludedDomains: new Set(),
-      useLabelProtection: true,
-      protectedLabelIds: null,
-      ...configOverrides,
-    };
-    return new DomainCollector(config);
+    return new DomainCollector(new CollectorConfig(configOverrides));
   }
 
   it('IMPORTANT label should always protect', () => {
@@ -138,12 +130,7 @@ describe('isProtected', () => {
 
 describe('isExcluded', () => {
   function makeCollector(excludedDomains = new Set()) {
-    return new DomainCollector({
-      limit: null,
-      excludedDomains,
-      useLabelProtection: true,
-      protectedLabelIds: null,
-    });
+    return new DomainCollector(new CollectorConfig({ excludedDomains }));
   }
 
   it('domain in exclusion list is excluded', () => {
@@ -166,53 +153,36 @@ describe('isExcluded', () => {
 
 describe('shouldInclude', () => {
   function makeCollector(configOverrides = {}) {
-    const config = {
-      limit: null,
-      excludedDomains: new Set(),
-      useLabelProtection: true,
-      protectedLabelIds: null,
-      ...configOverrides,
-    };
+    const config = new CollectorConfig(configOverrides);
     return new DomainCollector(config);
+  }
+
+  function makeThread(sender, labelIds = ['INBOX']) {
+    return new Thread('test', {
+      labelIds,
+      messages: [{
+        labelIds,
+        payload: { headers: [{ name: 'From', value: sender }] },
+      }],
+    });
   }
 
   it('regular thread is included', () => {
     const collector = makeCollector();
-    const metadata = {
-      threadId: 'test',
-      domain: 'spam.com',
-      subject: 'Test',
-      sender: 'test@spam.com',
-      messageCount: 1,
-      labelIds: ['INBOX'],
-    };
-    expect(collector._shouldInclude(metadata)).toBe(true);
+    const thread = makeThread('test@spam.com');
+    expect(collector._shouldInclude(thread)).toBe(true);
   });
 
   it('protected thread is excluded', () => {
     const collector = makeCollector();
-    const metadata = {
-      threadId: 'test',
-      domain: 'important.com',
-      subject: 'Test',
-      sender: 'test@important.com',
-      messageCount: 1,
-      labelIds: ['INBOX', 'IMPORTANT'],
-    };
-    expect(collector._shouldInclude(metadata)).toBe(false);
+    const thread = makeThread('test@important.com', ['INBOX', 'IMPORTANT']);
+    expect(collector._shouldInclude(thread)).toBe(false);
   });
 
   it('excluded domain thread is excluded', () => {
     const collector = makeCollector({ excludedDomains: new Set(['spam.com']) });
-    const metadata = {
-      threadId: 'test',
-      domain: 'spam.com',
-      subject: 'Test',
-      sender: 'test@spam.com',
-      messageCount: 1,
-      labelIds: ['INBOX'],
-    };
-    expect(collector._shouldInclude(metadata)).toBe(false);
+    const thread = makeThread('test@spam.com');
+    expect(collector._shouldInclude(thread)).toBe(false);
   });
 });
 
@@ -223,108 +193,98 @@ describe('collect', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks = createApiMocks(sampleInbox());
-
-    api.getInboxInfo.mockImplementation(mocks.getInboxInfo);
-    api.listThreads.mockImplementation(mocks.listThreads);
-    api.getThread.mockImplementation(mocks.getThread);
-    api.trashThread.mockImplementation(mocks.trashThread);
+    mocks = setupApiMocks(api, sampleInbox());
   });
 
   function defaultConfig(overrides = {}) {
-    return {
-      limit: null,
-      excludedDomains: new Set(),
-      useLabelProtection: true,
-      protectedLabelIds: null,
-      ...overrides,
-    };
+    return new CollectorConfig(overrides);
   }
 
   it('basic collection groups threads by domain', async () => {
     const collector = new DomainCollector(defaultConfig());
     const result = await collector.collect();
+    const dr = result.domainResults;
 
     // Should have collected domains (excluding protected ones)
-    expect(Object.keys(result).length).toBeGreaterThan(0);
+    expect(Object.keys(dr).length).toBeGreaterThan(0);
 
     // spam.com should have 2 threads (thread_001, thread_002)
-    expect(result['spam.com']).toBeDefined();
-    expect(result['spam.com'].count).toBe(2);
+    expect(dr['spam.com']).toBeDefined();
+    expect(dr['spam.com'].count).toBe(2);
 
     // social.com should have 1 thread
-    expect(result['social.com']).toBeDefined();
-    expect(result['social.com'].count).toBe(1);
+    expect(dr['social.com']).toBeDefined();
+    expect(dr['social.com'].count).toBe(1);
   });
 
   it('skips protected threads', async () => {
     const collector = new DomainCollector(defaultConfig());
     const result = await collector.collect();
+    const dr = result.domainResults;
 
     // important.com is IMPORTANT labeled - should not be in results
-    expect(result['important.com']).toBeUndefined();
+    expect(dr['important.com']).toBeUndefined();
 
     // starred.com is STARRED labeled - should not be in results
-    expect(result['starred.com']).toBeUndefined();
+    expect(dr['starred.com']).toBeUndefined();
 
     // labeled.com has custom label - should not be in results
-    expect(result['labeled.com']).toBeUndefined();
+    expect(dr['labeled.com']).toBeUndefined();
   });
 
   it('respects limit parameter', async () => {
     const collector = new DomainCollector(defaultConfig({ limit: 2 }));
     const result = await collector.collect();
+    const dr = result.domainResults;
 
     // Should have at most 2 threads total across all domains
-    const totalThreads = Object.values(result).reduce((sum, info) => sum + info.count, 0);
+    const totalThreads = Object.values(dr).reduce((sum, info) => sum + info.count, 0);
     expect(totalThreads).toBeLessThanOrEqual(2);
   });
 
   it('skips excluded domains', async () => {
     const collector = new DomainCollector(defaultConfig({ excludedDomains: new Set(['spam.com']) }));
     const result = await collector.collect();
+    const dr = result.domainResults;
 
     // spam.com should not be in results
-    expect(result['spam.com']).toBeUndefined();
+    expect(dr['spam.com']).toBeUndefined();
 
     // Other domains should still be present
-    expect(result['social.com']).toBeDefined();
+    expect(dr['social.com']).toBeDefined();
   });
 
-  it('empty inbox returns empty dict', async () => {
-    const emptyMocks = createApiMocks({ threadsTotal: 0, threads: [] });
-    api.getInboxInfo.mockImplementation(emptyMocks.getInboxInfo);
-    api.listThreads.mockImplementation(emptyMocks.listThreads);
-    api.getThread.mockImplementation(emptyMocks.getThread);
-    api.trashThread.mockImplementation(emptyMocks.trashThread);
+  it('empty inbox returns empty result', async () => {
+    setupApiMocks(api, { threadsTotal: 0, threads: [] });
 
     const collector = new DomainCollector(defaultConfig());
     const result = await collector.collect();
 
-    expect(Object.keys(result).length).toBe(0);
+    expect(Object.keys(result.domainResults).length).toBe(0);
   });
 
   it('stores thread metadata', async () => {
     const collector = new DomainCollector(defaultConfig());
-    await collector.collect();
+    const result = await collector.collect();
 
-    // Should have stored threads
-    expect(Object.keys(collector.threadsById).length).toBeGreaterThan(0);
-    expect(Object.keys(collector.threadsByDomain).length).toBeGreaterThan(0);
+    // Should have stored threads in the CollectionResult
+    expect(Object.keys(result.threadsById).length).toBeGreaterThan(0);
+    expect(Object.keys(result.threadsByDomain).length).toBeGreaterThan(0);
 
     // Check that spam.com threads are stored
-    expect(collector.threadsByDomain['spam.com']).toBeDefined();
-    expect(collector.threadsByDomain['spam.com'].length).toBe(2);
+    expect(result.threadsByDomain['spam.com']).toBeDefined();
+    expect(result.threadsByDomain['spam.com'].length).toBe(2);
   });
 
   it('multi-message thread reports correct message count', async () => {
     const collector = new DomainCollector(defaultConfig());
     const result = await collector.collect();
+    const dr = result.domainResults;
 
     // multi.com thread has 3 messages
-    expect(result['multi.com']).toBeDefined();
-    expect(result['multi.com'].threads.length).toBe(1);
-    expect(result['multi.com'].threads[0].message_count).toBe(3);
+    expect(dr['multi.com']).toBeDefined();
+    expect(dr['multi.com'].threads.length).toBe(1);
+    expect(dr['multi.com'].threads[0].message_count).toBe(3);
   });
 
   it('handles plain email format (no angle brackets)', async () => {
@@ -332,7 +292,7 @@ describe('collect', () => {
     const result = await collector.collect();
 
     // edge.com uses plain email format
-    expect(result['edge.com']).toBeDefined();
+    expect(result.domainResults['edge.com']).toBeDefined();
   });
 
   it('calls progress callback', async () => {
@@ -351,12 +311,13 @@ describe('collect', () => {
   it('with label protection disabled, custom-labeled threads are collected', async () => {
     const collector = new DomainCollector(defaultConfig({ useLabelProtection: false }));
     const result = await collector.collect();
+    const dr = result.domainResults;
 
     // labeled.com should now be in results (custom label no longer protects)
-    expect(result['labeled.com']).toBeDefined();
+    expect(dr['labeled.com']).toBeDefined();
 
     // But IMPORTANT and STARRED should still be protected
-    expect(result['important.com']).toBeUndefined();
-    expect(result['starred.com']).toBeUndefined();
+    expect(dr['important.com']).toBeUndefined();
+    expect(dr['starred.com']).toBeUndefined();
   });
 });

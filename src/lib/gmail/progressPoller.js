@@ -38,20 +38,29 @@ export function stopProgressPolling() {
 }
 
 function pollCollection(p) {
-  const { processedThreads, totalThreads, uniqueDomains } = p;
+  const { matchedThreads, threadsExamined, totalInboxThreads, limit, uniqueDomains } = p;
 
-  if (totalThreads > 0) {
-    const percentage = Math.round((processedThreads / totalThreads) * 100);
+  if (limit) {
+    // User set a cap — progress = threads examined toward the cap
+    const percentage = Math.min(Math.round((threadsExamined / limit) * 100), 99);
     progressIndeterminate.set(false);
     progressPercent.set(percentage);
     progressText.set(
-      `Processed ${processedThreads.toLocaleString()}/${totalThreads.toLocaleString()} threads (${percentage}%), found ${uniqueDomains.toLocaleString()} unique domains`
+      `Scanned ${threadsExamined.toLocaleString()}/${limit.toLocaleString()} threads, found ${matchedThreads.toLocaleString()} in ${uniqueDomains.toLocaleString()} domains`
+    );
+  } else if (totalInboxThreads > 0) {
+    // No limit — progress = how far through the inbox we've scanned
+    const percentage = Math.min(Math.round((threadsExamined / totalInboxThreads) * 100), 99);
+    progressIndeterminate.set(false);
+    progressPercent.set(percentage);
+    progressText.set(
+      `Scanned ${threadsExamined.toLocaleString()}/${totalInboxThreads.toLocaleString()} threads, found ${matchedThreads.toLocaleString()} in ${uniqueDomains.toLocaleString()} domains`
     );
   } else {
     progressIndeterminate.set(true);
     progressPercent.set(100);
     progressText.set(
-      `Processed ${processedThreads.toLocaleString()} threads, found ${uniqueDomains.toLocaleString()} unique domains`
+      `Scanned ${threadsExamined.toLocaleString()} threads, found ${matchedThreads.toLocaleString()} in ${uniqueDomains.toLocaleString()} domains`
     );
   }
 }

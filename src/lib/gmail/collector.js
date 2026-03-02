@@ -7,6 +7,7 @@ import { ThreadsList, Thread, CleanupThread, DomainResult, CollectionResult } fr
 import {
   SUBJECT_TRUNCATE_COLLECTOR,
   MILESTONE_LOG_INTERVAL,
+  MACROTASK_YIELD_INTERVAL,
   THREAD_PAGE_SIZE,
 } from '../constants.js';
 import { getErrorMessage } from '../errors.js';
@@ -23,8 +24,10 @@ export class DomainCollector {
 
     // Pollable progress state — UI reads this via setInterval
     this.progress = {
-      processedThreads: 0,
-      totalThreads: 0,
+      matchedThreads: 0,       // threads that passed the filter
+      threadsExamined: 0,      // all threads fetched from API (including filtered)
+      totalInboxThreads: 0,    // actual inbox size
+      limit: null,             // user-requested cap on matched threads (null = no limit)
       uniqueDomains: 0,
       currentDomain: '',
       status: 'idle', // 'idle' | 'running' | 'completed' | 'error'
@@ -56,8 +59,10 @@ export class DomainCollector {
 
     // Initialize pollable progress
     this.progress.status = 'running';
-    this.progress.totalThreads = effectiveTotal;
-    this.progress.processedThreads = 0;
+    this.progress.totalInboxThreads = totalThreadCount;
+    this.progress.limit = this.config.limit || null;
+    this.progress.matchedThreads = 0;
+    this.progress.threadsExamined = 0;
     this.progress.uniqueDomains = 0;
     this.progress.currentDomain = '';
     this.progress.errorMessage = null;
@@ -65,6 +70,7 @@ export class DomainCollector {
     const domainCounts = {}; // domain -> count
     let pageToken = null;
     let totalThreads = 0;
+    let threadsExamined = 0;
 
     while (!this.interrupted) {
       try {
@@ -79,6 +85,15 @@ export class DomainCollector {
 
           const thread = await this._getThread(threadId);
 
+          threadsExamined += 1;
+          this.progress.threadsExamined = threadsExamined;
+
+          // Yield to macrotask queue periodically so setInterval (poller) can fire.
+          // Based on examined count so yields still happen while scanning filtered threads.
+          if (threadsExamined % MACROTASK_YIELD_INTERVAL === 0) {
+            await new Promise((r) => setTimeout(r, 0));
+          }
+
           if (thread === null) continue;
           if (!this._shouldInclude(thread)) continue;
 
@@ -92,7 +107,7 @@ export class DomainCollector {
           totalThreads += 1;
 
           // Update pollable progress in-place (no await, no callback)
-          this.progress.processedThreads = totalThreads;
+          this.progress.matchedThreads = totalThreads;
           this.progress.uniqueDomains = Object.keys(domainCounts).length;
           this.progress.currentDomain = domain;
 
@@ -105,14 +120,14 @@ export class DomainCollector {
             });
           }
 
-          // Check limit
-          if (this.config.limit && totalThreads >= this.config.limit) {
+          // Check limit (caps total threads examined, not just matched)
+          if (this.config.limit && threadsExamined >= this.config.limit) {
             break;
           }
         }
 
         // Check if we hit limit
-        if (this.config.limit && totalThreads >= this.config.limit) {
+        if (this.config.limit && threadsExamined >= this.config.limit) {
           break;
         }
 

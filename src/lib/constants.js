@@ -12,6 +12,9 @@ export const PROGRESS_POLL_INTERVAL_MS = 200;
 // Log a milestone summary every N threads during collection
 export const MILESTONE_LOG_INTERVAL = 100;
 
+// Yield to the macrotask queue every N threads so setInterval (poller) can fire
+export const MACROTASK_YIELD_INTERVAL = 50;
+
 // Gmail API page size for listing threads
 export const THREAD_PAGE_SIZE = 100;
 

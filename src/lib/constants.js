@@ -6,11 +6,14 @@
 export const SUBJECT_TRUNCATE_COLLECTOR = 60;
 export const SUBJECT_TRUNCATE_CLEANER = 50;
 
-// How often to yield control to the UI event loop (every N threads)
-export const UI_YIELD_INTERVAL = 10;
+// How often the UI polls the worker's progress object (ms)
+export const PROGRESS_POLL_INTERVAL_MS = 200;
+
+// Log a milestone summary every N threads during collection
+export const MILESTONE_LOG_INTERVAL = 100;
 
 // Gmail API page size for listing threads
 export const THREAD_PAGE_SIZE = 100;
 
 // Max log entries kept in the progress log store
-export const MAX_LOG_MESSAGES = 200;
+export const MAX_LOG_MESSAGES = 50;

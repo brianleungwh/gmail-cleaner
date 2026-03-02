@@ -1,5 +1,8 @@
 /**
  * Progress Handler - Creates callbacks that update Svelte stores
+ *
+ * Only handles infrequent lifecycle events. Per-thread progress is
+ * handled by the progressPoller reading worker.progress on a timer.
  */
 
 import { totalThreads } from '../stores/collectionStore.js';
@@ -16,23 +19,14 @@ export function createProgressHandler() {
       case 'collection_started':
         handleCollectionStarted(data);
         break;
-      case 'thread_processed':
-        handleThreadProcessed(data);
+      case 'milestone':
+        handleMilestone(data);
         break;
       case 'collection_completed':
         handleCollectionCompleted(data);
         break;
       case 'cleanup_started':
         handleCleanupStarted(data);
-        break;
-      case 'thread_analyzed':
-        handleThreadAnalyzed(data);
-        break;
-      case 'would_delete':
-        handleWouldDelete(data);
-        break;
-      case 'deleted':
-        handleDeleted(data);
         break;
       case 'cleanup_completed':
         handleCleanupCompleted(data);
@@ -51,8 +45,8 @@ function handleCollectionStarted(data) {
   totalThreads.set(total);
 
   if (total > 0) {
-    addLog(`Starting domain collection... (${total} total threads)`, 'info');
-    progressText.set(`Scanning ${total} inbox threads...`);
+    addLog(`Starting domain collection... (${total.toLocaleString()} total threads)`, 'info');
+    progressText.set(`Scanning ${total.toLocaleString()} inbox threads...`);
   } else {
     addLog('Starting domain collection...', 'info');
     progressText.set('Scanning inbox threads...');
@@ -62,21 +56,12 @@ function handleCollectionStarted(data) {
   progressPercent.set(0);
 }
 
-function handleThreadProcessed(data) {
-  const { thread_id, domain, subject, processed_threads, total_threads, unique_domains } = data;
-  addLog(`Thread ${thread_id}: ${domain} - "${subject}"`, 'info');
-
-  if (total_threads > 0) {
-    const percentage = Math.round((processed_threads / total_threads) * 100);
-    progressIndeterminate.set(false);
-    progressPercent.set(percentage);
-    progressText.set(`Processed ${processed_threads}/${total_threads} threads (${percentage}%), found ${unique_domains} unique domains`);
-  } else {
-    progressText.set(`Processed ${processed_threads} threads, found ${unique_domains} unique domains`);
-    // Use get() to check current value without subscribing
-    progressIndeterminate.set(true);
-    progressPercent.set(100);
-  }
+function handleMilestone(data) {
+  const { processed_threads, total_threads, unique_domains } = data;
+  addLog(
+    `Processed ${processed_threads.toLocaleString()}/${total_threads.toLocaleString()} threads, ${unique_domains.toLocaleString()} domains found`,
+    'info'
+  );
 }
 
 function handleCollectionCompleted(data) {
@@ -93,21 +78,6 @@ function handleCleanupStarted(data) {
   const mode = dry_run ? 'preview' : 'cleanup';
   addLog(`Starting ${mode} for ${threads_to_process} threads...`, 'info');
   progressText.set(`${dry_run ? 'Previewing' : 'Cleaning'} selected domains...`);
-}
-
-function handleThreadAnalyzed(data) {
-  const { subject, sender } = data;
-  addLog(`Analyzing: ${sender} - "${subject}"`, 'info');
-}
-
-function handleWouldDelete(data) {
-  const { subject, sender, message_count } = data;
-  addLog(`WOULD DELETE: ${sender} - "${subject}" (${message_count} msgs)`, 'warning');
-}
-
-function handleDeleted(data) {
-  const { subject, sender, message_count } = data;
-  addLog(`DELETED: ${sender} - "${subject}" (${message_count} msgs)`, 'success');
 }
 
 function handleCleanupCompleted(data) {

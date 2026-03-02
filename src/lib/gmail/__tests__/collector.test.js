@@ -295,7 +295,7 @@ describe('collect', () => {
     expect(result.domainResults['edge.com']).toBeDefined();
   });
 
-  it('calls progress callback', async () => {
+  it('calls progress callback with lifecycle events (not per-thread)', async () => {
     const progressEvents = [];
     const callback = async (event, data) => progressEvents.push([event, data]);
 
@@ -305,7 +305,23 @@ describe('collect', () => {
     const eventTypes = progressEvents.map(e => e[0]);
     expect(eventTypes).toContain('collection_started');
     expect(eventTypes).toContain('collection_completed');
-    expect(eventTypes).toContain('thread_processed');
+    // thread_processed is no longer emitted — replaced by pollable progress
+    expect(eventTypes).not.toContain('thread_processed');
+  });
+
+  it('updates progress object during collection', async () => {
+    const collector = new DomainCollector(defaultConfig());
+
+    // Before collection
+    expect(collector.progress.status).toBe('idle');
+    expect(collector.progress.processedThreads).toBe(0);
+
+    await collector.collect();
+
+    // After collection
+    expect(collector.progress.status).toBe('completed');
+    expect(collector.progress.processedThreads).toBeGreaterThan(0);
+    expect(collector.progress.uniqueDomains).toBeGreaterThan(0);
   });
 
   it('with label protection disabled, custom-labeled threads are collected', async () => {

@@ -6,7 +6,7 @@ import { getInboxInfo, listThreads, getThread } from './api.js';
 import { ThreadsList, Thread, CleanupThread, DomainResult, CollectionResult } from '../models/index.js';
 import {
   SUBJECT_TRUNCATE_COLLECTOR,
-  UI_YIELD_INTERVAL,
+  MILESTONE_LOG_INTERVAL,
   THREAD_PAGE_SIZE,
 } from '../constants.js';
 import { getErrorMessage } from '../errors.js';
@@ -20,6 +20,16 @@ export class DomainCollector {
     this.threadsById = {};      // threadId -> Thread
     this.threadsByDomain = {};  // domain -> [threadId, ...]
     this.interrupted = false;
+
+    // Pollable progress state — UI reads this via setInterval
+    this.progress = {
+      processedThreads: 0,
+      totalThreads: 0,
+      uniqueDomains: 0,
+      currentDomain: '',
+      status: 'idle', // 'idle' | 'running' | 'completed' | 'error'
+      errorMessage: null,
+    };
   }
 
   // === Main Entry Point ===
@@ -43,6 +53,14 @@ export class DomainCollector {
     // Clear any previous state
     this.threadsById = {};
     this.threadsByDomain = {};
+
+    // Initialize pollable progress
+    this.progress.status = 'running';
+    this.progress.totalThreads = effectiveTotal;
+    this.progress.processedThreads = 0;
+    this.progress.uniqueDomains = 0;
+    this.progress.currentDomain = '';
+    this.progress.errorMessage = null;
 
     const domainCounts = {}; // domain -> count
     let pageToken = null;
@@ -73,29 +91,23 @@ export class DomainCollector {
 
           totalThreads += 1;
 
-          // Send progress update
-          const subject = thread.getSubject();
-          const truncatedSubject = subject.length > SUBJECT_TRUNCATE_COLLECTOR
-            ? subject.slice(0, SUBJECT_TRUNCATE_COLLECTOR) + '...'
-            : subject;
+          // Update pollable progress in-place (no await, no callback)
+          this.progress.processedThreads = totalThreads;
+          this.progress.uniqueDomains = Object.keys(domainCounts).length;
+          this.progress.currentDomain = domain;
 
-          await this._reportProgress('thread_processed', {
-            thread_id: threadId,
-            domain,
-            subject: truncatedSubject,
-            processed_threads: totalThreads,
-            total_threads: effectiveTotal,
-            unique_domains: Object.keys(domainCounts).length,
-          });
+          // Milestone logging — infrequent, so callback cost is fine
+          if (totalThreads % MILESTONE_LOG_INTERVAL === 0) {
+            await this._reportProgress('milestone', {
+              processed_threads: totalThreads,
+              total_threads: effectiveTotal,
+              unique_domains: Object.keys(domainCounts).length,
+            });
+          }
 
           // Check limit
           if (this.config.limit && totalThreads >= this.config.limit) {
             break;
-          }
-
-          // Yield control periodically to let UI update
-          if (totalThreads % UI_YIELD_INTERVAL === 0) {
-            await new Promise((r) => setTimeout(r, 0));
           }
         }
 
@@ -107,6 +119,8 @@ export class DomainCollector {
         pageToken = page.nextPageToken;
         if (!pageToken) break;
       } catch (error) {
+        this.progress.status = 'error';
+        this.progress.errorMessage = getErrorMessage(error);
         await this._reportProgress('error', {
           message: `Error fetching threads: ${getErrorMessage(error)}`,
         });
@@ -118,6 +132,8 @@ export class DomainCollector {
     const result = this._buildResults(domainCounts);
 
     const limitMsg = this.config.limit ? ` (limited to ${this.config.limit})` : '';
+    this.progress.status = 'completed';
+
     await this._reportProgress('collection_completed', {
       processed_threads: totalThreads,
       total_threads: effectiveTotal,

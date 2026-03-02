@@ -102,7 +102,7 @@ describe('cleanup', () => {
     expect(result.messages_deleted).toBe(4); // 1 + 3 from successful threads
   });
 
-  it('calls progress callback during cleanup', async () => {
+  it('calls progress callback with lifecycle events (not per-thread)', async () => {
     const progressEvents = [];
     const callback = async (event, data) => progressEvents.push([event, data]);
 
@@ -112,20 +112,25 @@ describe('cleanup', () => {
     const eventTypes = progressEvents.map(e => e[0]);
     expect(eventTypes).toContain('cleanup_started');
     expect(eventTypes).toContain('cleanup_completed');
-    expect(eventTypes).toContain('thread_analyzed');
-    expect(eventTypes).toContain('would_delete'); // dry run
+    // Per-thread callbacks are no longer emitted — replaced by pollable progress
+    expect(eventTypes).not.toContain('thread_analyzed');
+    expect(eventTypes).not.toContain('would_delete');
+    expect(eventTypes).not.toContain('deleted');
   });
 
-  it('live cleanup emits deleted events instead of would_delete', async () => {
-    const progressEvents = [];
-    const callback = async (event, data) => progressEvents.push([event, data]);
+  it('updates progress object during cleanup', async () => {
+    const cleaner = new DomainCleaner(new CleanerConfig({ dryRun: true }));
 
-    const cleaner = new DomainCleaner(new CleanerConfig({ dryRun: false }), callback);
+    // Before cleanup
+    expect(cleaner.progress.status).toBe('idle');
+    expect(cleaner.progress.totalProcessed).toBe(0);
+
     await cleaner.cleanup(sampleThreads());
 
-    const eventTypes = progressEvents.map(e => e[0]);
-    expect(eventTypes).toContain('deleted');
-    expect(eventTypes).not.toContain('would_delete');
+    // After cleanup
+    expect(cleaner.progress.status).toBe('completed');
+    expect(cleaner.progress.totalProcessed).toBe(3);
+    expect(cleaner.progress.threadsDeleted).toBe(3);
   });
 });
 
@@ -162,19 +167,16 @@ describe('interrupt handling', () => {
   it('stops when interrupted flag is set', async () => {
     const cleaner = new DomainCleaner(new CleanerConfig({ dryRun: true }));
 
-    let processedCount = 0;
+    // Set interrupted after cleanup_started fires (before any thread processing)
     cleaner.progressCallback = async (event) => {
-      if (event === 'thread_analyzed') {
-        processedCount += 1;
-        if (processedCount >= 1) {
-          cleaner.interrupted = true;
-        }
+      if (event === 'cleanup_started') {
+        cleaner.interrupted = true;
       }
     };
 
     const result = await cleaner.cleanup(sampleThreads());
 
-    // Should have stopped early
+    // Should have stopped early (processed 0 threads since interrupted before loop)
     expect(result.threads_processed).toBeLessThan(sampleThreads().length);
   });
 });

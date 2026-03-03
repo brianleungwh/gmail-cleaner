@@ -314,17 +314,17 @@ describe('collect', () => {
 
     // Before collection
     expect(collector.progress.status).toBe('idle');
-    expect(collector.progress.matchedThreads).toBe(0);
-    expect(collector.progress.threadsExamined).toBe(0);
+    expect(collector.progress.collected).toBe(0);
+    expect(collector.progress.scanned).toBe(0);
 
     await collector.collect();
 
     // After collection
     expect(collector.progress.status).toBe('completed');
-    expect(collector.progress.matchedThreads).toBeGreaterThan(0);
+    expect(collector.progress.collected).toBeGreaterThan(0);
     expect(collector.progress.uniqueDomains).toBeGreaterThan(0);
-    // threadsExamined >= matchedThreads (includes filtered threads)
-    expect(collector.progress.threadsExamined).toBeGreaterThanOrEqual(collector.progress.matchedThreads);
+    // scanned >= collected (includes filtered threads)
+    expect(collector.progress.scanned).toBeGreaterThanOrEqual(collector.progress.collected);
   });
 
   it('with label protection disabled, custom-labeled threads are collected', async () => {

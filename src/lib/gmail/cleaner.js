@@ -4,7 +4,7 @@
 
 import { trashThread } from './api.js';
 import { CleanupStats } from '../models/index.js';
-import { SUBJECT_TRUNCATE_CLEANER } from '../constants.js';
+
 
 export class DomainCleaner {
   constructor(config, progressCallback = null) {
@@ -14,11 +14,9 @@ export class DomainCleaner {
 
     // Pollable progress state — UI reads this via setInterval
     this.progress = {
-      totalToProcess: 0,
-      totalProcessed: 0,
-      threadsDeleted: 0,
-      messagesDeleted: 0,
-      currentSubject: '',
+      processed: 0,
+      processTotal: 0,
+      deleted: 0,
       dryRun: false,
       status: 'idle',
     };
@@ -32,18 +30,15 @@ export class DomainCleaner {
     }
 
     // Initialize pollable progress
-    this.progress.totalToProcess = threads.length;
+    this.progress.processTotal = threads.length;
     this.progress.dryRun = this.config.dryRun;
     this.progress.status = 'running';
-    this.progress.totalProcessed = 0;
-    this.progress.threadsDeleted = 0;
-    this.progress.messagesDeleted = 0;
-    this.progress.currentSubject = '';
+    this.progress.processed = 0;
+    this.progress.deleted = 0;
 
     await this._reportProgress('cleanup_started', {
       dry_run: this.config.dryRun,
-      limit: this.config.limit,
-      threads_to_process: threads.length,
+      process_total: threads.length,
     });
 
     let totalProcessed = 0;
@@ -54,14 +49,7 @@ export class DomainCleaner {
     for (const thread of threads) {
       if (this.interrupted) break;
 
-      const { thread_id, domain, subject, sender, message_count } = thread;
-
-      const truncatedSubject = subject.length > SUBJECT_TRUNCATE_CLEANER
-        ? subject.slice(0, SUBJECT_TRUNCATE_CLEANER) + '...'
-        : subject;
-
-      // Update pollable progress in-place
-      this.progress.currentSubject = truncatedSubject;
+      const { thread_id, message_count } = thread;
 
       if (this.config.dryRun) {
         // Dry run - just count what would happen
@@ -82,9 +70,8 @@ export class DomainCleaner {
       totalProcessed += 1;
 
       // Update pollable progress in-place
-      this.progress.totalProcessed = totalProcessed;
-      this.progress.threadsDeleted = threadsDeleted;
-      this.progress.messagesDeleted = messagesDeleted;
+      this.progress.processed = totalProcessed;
+      this.progress.deleted = threadsDeleted;
     }
 
     this.progress.status = 'completed';

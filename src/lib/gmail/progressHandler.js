@@ -5,7 +5,7 @@
  * handled by the progressPoller reading worker.progress on a timer.
  */
 
-import { totalThreads } from '../stores/collectionStore.js';
+import { scanTotal } from '../stores/collectionStore.js';
 import { progressPercent, progressText, progressIndeterminate, addLog } from '../stores/progressStore.js';
 import { hideProgress, showResults } from '../stores/uiStore.js';
 
@@ -41,8 +41,8 @@ export function createProgressHandler() {
 }
 
 function handleCollectionStarted(data) {
-  const total = data.total_threads || 0;
-  totalThreads.set(total);
+  const total = data.scan_total || 0;
+  scanTotal.set(total);
 
   if (total > 0) {
     addLog(`Starting domain collection... (${total.toLocaleString()} total threads)`, 'info');
@@ -57,16 +57,16 @@ function handleCollectionStarted(data) {
 }
 
 function handleMilestone(data) {
-  const { processed_threads, total_threads, unique_domains } = data;
+  const { scanned, collected, scan_total, unique_domains } = data;
   addLog(
-    `Processed ${processed_threads.toLocaleString()}/${total_threads.toLocaleString()} threads, ${unique_domains.toLocaleString()} domains found`,
+    `Scanned ${scanned.toLocaleString()}/${scan_total.toLocaleString()} threads, collected ${collected.toLocaleString()}, ${unique_domains.toLocaleString()} domains found`,
     'info'
   );
 }
 
 function handleCollectionCompleted(data) {
-  const { processed_threads, unique_domains } = data;
-  addLog(`Collection complete: ${processed_threads} threads processed, ${unique_domains} domains found`, 'success');
+  const { collected, unique_domains } = data;
+  addLog(`Collection complete: ${collected} threads collected, ${unique_domains} domains found`, 'success');
 
   progressIndeterminate.set(false);
   progressPercent.set(100);
@@ -74,9 +74,9 @@ function handleCollectionCompleted(data) {
 }
 
 function handleCleanupStarted(data) {
-  const { threads_to_process, dry_run } = data;
+  const { process_total, dry_run } = data;
   const mode = dry_run ? 'preview' : 'cleanup';
-  addLog(`Starting ${mode} for ${threads_to_process} threads...`, 'info');
+  addLog(`Starting ${mode} for ${process_total} threads...`, 'info');
   progressText.set(`${dry_run ? 'Previewing' : 'Cleaning'} selected domains...`);
 }
 

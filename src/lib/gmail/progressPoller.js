@@ -38,43 +38,34 @@ export function stopProgressPolling() {
 }
 
 function pollCollection(p) {
-  const { matchedThreads, threadsExamined, totalInboxThreads, limit, uniqueDomains } = p;
+  const { scanned, scanTotal, collected, uniqueDomains } = p;
 
-  if (limit) {
-    // User set a cap — progress = threads examined toward the cap
-    const percentage = Math.min(Math.round((threadsExamined / limit) * 100), 99);
+  if (scanTotal > 0) {
+    const percentage = Math.min(Math.round((scanned / scanTotal) * 100), 99);
     progressIndeterminate.set(false);
     progressPercent.set(percentage);
     progressText.set(
-      `Scanned ${threadsExamined.toLocaleString()}/${limit.toLocaleString()} threads, found ${matchedThreads.toLocaleString()} in ${uniqueDomains.toLocaleString()} domains`
-    );
-  } else if (totalInboxThreads > 0) {
-    // No limit — progress = how far through the inbox we've scanned
-    const percentage = Math.min(Math.round((threadsExamined / totalInboxThreads) * 100), 99);
-    progressIndeterminate.set(false);
-    progressPercent.set(percentage);
-    progressText.set(
-      `Scanned ${threadsExamined.toLocaleString()}/${totalInboxThreads.toLocaleString()} threads, found ${matchedThreads.toLocaleString()} in ${uniqueDomains.toLocaleString()} domains`
+      `Scanned ${scanned.toLocaleString()}/${scanTotal.toLocaleString()} threads, found ${collected.toLocaleString()} in ${uniqueDomains.toLocaleString()} domains`
     );
   } else {
     progressIndeterminate.set(true);
     progressPercent.set(100);
     progressText.set(
-      `Scanned ${threadsExamined.toLocaleString()} threads, found ${matchedThreads.toLocaleString()} in ${uniqueDomains.toLocaleString()} domains`
+      `Scanned ${scanned.toLocaleString()} threads, found ${collected.toLocaleString()} in ${uniqueDomains.toLocaleString()} domains`
     );
   }
 }
 
 function pollCleanup(p) {
-  const { totalProcessed, totalToProcess, threadsDeleted, dryRun } = p;
+  const { processed, processTotal, deleted, dryRun } = p;
   const action = dryRun ? 'Previewing' : 'Cleaning';
 
-  if (totalToProcess > 0) {
-    const percentage = Math.round((totalProcessed / totalToProcess) * 100);
+  if (processTotal > 0) {
+    const percentage = Math.round((processed / processTotal) * 100);
     progressIndeterminate.set(false);
     progressPercent.set(percentage);
     progressText.set(
-      `${action}: ${totalProcessed}/${totalToProcess} threads (${threadsDeleted} deleted)`
+      `${action}: ${processed}/${processTotal} threads (${deleted} deleted)`
     );
   } else {
     progressText.set(`${action}...`);

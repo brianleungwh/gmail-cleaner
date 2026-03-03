@@ -123,14 +123,14 @@ describe('cleanup', () => {
 
     // Before cleanup
     expect(cleaner.progress.status).toBe('idle');
-    expect(cleaner.progress.totalProcessed).toBe(0);
+    expect(cleaner.progress.processed).toBe(0);
 
     await cleaner.cleanup(sampleThreads());
 
     // After cleanup
     expect(cleaner.progress.status).toBe('completed');
-    expect(cleaner.progress.totalProcessed).toBe(3);
-    expect(cleaner.progress.threadsDeleted).toBe(3);
+    expect(cleaner.progress.processed).toBe(3);
+    expect(cleaner.progress.deleted).toBe(3);
   });
 });
 

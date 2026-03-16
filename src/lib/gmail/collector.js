@@ -7,10 +7,11 @@ import { ThreadsList, Thread, CleanupThread, DomainResult, CollectionResult } fr
 import {
   SUBJECT_TRUNCATE_COLLECTOR,
   MILESTONE_LOG_INTERVAL,
-  MACROTASK_YIELD_INTERVAL,
   THREAD_PAGE_SIZE,
+  API_CONCURRENCY,
 } from '../constants.js';
 import { getErrorMessage } from '../errors.js';
+import { asyncPool } from '../asyncPool.js';
 
 export class DomainCollector {
   constructor(config, progressCallback = null) {
@@ -75,19 +76,15 @@ export class DomainCollector {
           break;
         }
 
-        for (const threadId of page.threadIds) {
-          if (this.interrupted) break;
+        // Fetch all threads in page concurrently
+        const threads = await asyncPool(page.threadIds, API_CONCURRENCY, (id) => this._getThread(id));
 
-          const thread = await this._getThread(threadId);
+        // Process results sequentially (filters, progress, storage)
+        for (const thread of threads) {
+          if (this.interrupted) break;
 
           scanned += 1;
           this.progress.scanned = scanned;
-
-          // Yield to macrotask queue periodically so setInterval (poller) can fire.
-          // Based on examined count so yields still happen while scanning filtered threads.
-          if (scanned % MACROTASK_YIELD_INTERVAL === 0) {
-            await new Promise((r) => setTimeout(r, 0));
-          }
 
           if (thread === null) continue;
           if (!this._shouldInclude(thread)) continue;

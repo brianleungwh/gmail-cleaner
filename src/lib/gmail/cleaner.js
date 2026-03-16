@@ -4,6 +4,8 @@
 
 import { trashThread } from './api.js';
 import { CleanupStats } from '../models/index.js';
+import { API_CONCURRENCY } from '../constants.js';
+import { asyncPool } from '../asyncPool.js';
 
 
 export class DomainCleaner {
@@ -46,32 +48,39 @@ export class DomainCleaner {
     let messagesDeleted = 0;
     let messagesKept = 0;
 
-    for (const thread of threads) {
-      if (this.interrupted) break;
+    if (this.config.dryRun) {
+      // No API calls — simple sequential loop
+      for (const thread of threads) {
+        if (this.interrupted) break;
 
-      const { thread_id, message_count } = thread;
-
-      if (this.config.dryRun) {
-        // Dry run - just count what would happen
         threadsDeleted += 1;
-        messagesDeleted += message_count;
-      } else {
-        // Actually delete the thread
-        const success = await this._trashThread(thread_id);
+        messagesDeleted += thread.message_count;
+        totalProcessed += 1;
+
+        this.progress.processed = totalProcessed;
+        this.progress.deleted = threadsDeleted;
+      }
+    } else {
+      // Batch trash calls concurrently
+      const results = await asyncPool(threads, API_CONCURRENCY, async (thread) => {
+        return { thread, success: await this._trashThread(thread.thread_id) };
+      });
+
+      for (const { thread, success } of results) {
+        if (this.interrupted) break;
 
         if (success) {
           threadsDeleted += 1;
-          messagesDeleted += message_count;
+          messagesDeleted += thread.message_count;
         } else {
-          messagesKept += message_count;
+          messagesKept += thread.message_count;
         }
+
+        totalProcessed += 1;
+
+        this.progress.processed = totalProcessed;
+        this.progress.deleted = threadsDeleted;
       }
-
-      totalProcessed += 1;
-
-      // Update pollable progress in-place
-      this.progress.processed = totalProcessed;
-      this.progress.deleted = threadsDeleted;
     }
 
     this.progress.status = 'completed';

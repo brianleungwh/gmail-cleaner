@@ -20,3 +20,6 @@ export const THREAD_PAGE_SIZE = 100;
 
 // Max log entries kept in the progress log store
 export const MAX_LOG_MESSAGES = 50;
+
+// Number of concurrent Gmail API calls (per-user quota ~250 units/sec)
+export const API_CONCURRENCY = 5;

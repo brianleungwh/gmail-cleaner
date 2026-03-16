@@ -6,7 +6,8 @@ import { getInboxInfo, listThreads, getThread } from './api.js';
 import { ThreadsList, Thread, CleanupThread, DomainResult, CollectionResult } from '../models/index.js';
 import {
   SUBJECT_TRUNCATE_COLLECTOR,
-  UI_YIELD_INTERVAL,
+  MILESTONE_LOG_INTERVAL,
+  MACROTASK_YIELD_INTERVAL,
   THREAD_PAGE_SIZE,
 } from '../constants.js';
 import { getErrorMessage } from '../errors.js';
@@ -20,13 +21,23 @@ export class DomainCollector {
     this.threadsById = {};      // threadId -> Thread
     this.threadsByDomain = {};  // domain -> [threadId, ...]
     this.interrupted = false;
+
+    // Pollable progress state — UI reads this via setInterval
+    this.progress = {
+      scanned: 0,
+      scanTotal: 0,
+      collected: 0,
+      uniqueDomains: 0,
+      status: 'idle', // 'idle' | 'running' | 'completed' | 'error'
+      errorMessage: null,
+    };
   }
 
   // === Main Entry Point ===
 
   async collect() {
     const totalThreadCount = await this._getTotalThreadCount();
-    const effectiveTotal = this.config.limit
+    const scanTotal = this.config.limit
       ? Math.min(this.config.limit, totalThreadCount)
       : totalThreadCount;
 
@@ -36,17 +47,25 @@ export class DomainCollector {
 
     await this._reportProgress('collection_started', {
       message,
-      total_threads: effectiveTotal,
-      limit: this.config.limit,
+      scan_total: scanTotal,
     });
 
     // Clear any previous state
     this.threadsById = {};
     this.threadsByDomain = {};
 
+    // Initialize pollable progress
+    this.progress.status = 'running';
+    this.progress.scanTotal = scanTotal;
+    this.progress.scanned = 0;
+    this.progress.collected = 0;
+    this.progress.uniqueDomains = 0;
+    this.progress.errorMessage = null;
+
     const domainCounts = {}; // domain -> count
     let pageToken = null;
-    let totalThreads = 0;
+    let collected = 0;
+    let scanned = 0;
 
     while (!this.interrupted) {
       try {
@@ -61,6 +80,15 @@ export class DomainCollector {
 
           const thread = await this._getThread(threadId);
 
+          scanned += 1;
+          this.progress.scanned = scanned;
+
+          // Yield to macrotask queue periodically so setInterval (poller) can fire.
+          // Based on examined count so yields still happen while scanning filtered threads.
+          if (scanned % MACROTASK_YIELD_INTERVAL === 0) {
+            await new Promise((r) => setTimeout(r, 0));
+          }
+
           if (thread === null) continue;
           if (!this._shouldInclude(thread)) continue;
 
@@ -71,42 +99,38 @@ export class DomainCollector {
           const domain = thread.getDomain();
           domainCounts[domain] = (domainCounts[domain] || 0) + 1;
 
-          totalThreads += 1;
+          collected += 1;
 
-          // Send progress update
-          const subject = thread.getSubject();
-          const truncatedSubject = subject.length > SUBJECT_TRUNCATE_COLLECTOR
-            ? subject.slice(0, SUBJECT_TRUNCATE_COLLECTOR) + '...'
-            : subject;
+          // Update pollable progress in-place (no await, no callback)
+          this.progress.collected = collected;
+          this.progress.uniqueDomains = Object.keys(domainCounts).length;
 
-          await this._reportProgress('thread_processed', {
-            thread_id: threadId,
-            domain,
-            subject: truncatedSubject,
-            processed_threads: totalThreads,
-            total_threads: effectiveTotal,
-            unique_domains: Object.keys(domainCounts).length,
-          });
-
-          // Check limit
-          if (this.config.limit && totalThreads >= this.config.limit) {
-            break;
+          // Milestone logging — infrequent, so callback cost is fine
+          if (collected % MILESTONE_LOG_INTERVAL === 0) {
+            await this._reportProgress('milestone', {
+              scanned,
+              collected,
+              scan_total: scanTotal,
+              unique_domains: Object.keys(domainCounts).length,
+            });
           }
 
-          // Yield control periodically to let UI update
-          if (totalThreads % UI_YIELD_INTERVAL === 0) {
-            await new Promise((r) => setTimeout(r, 0));
+          // Check limit (caps total threads examined, not just matched)
+          if (this.config.limit && scanned >= this.config.limit) {
+            break;
           }
         }
 
         // Check if we hit limit
-        if (this.config.limit && totalThreads >= this.config.limit) {
+        if (this.config.limit && scanned >= this.config.limit) {
           break;
         }
 
         pageToken = page.nextPageToken;
         if (!pageToken) break;
       } catch (error) {
+        this.progress.status = 'error';
+        this.progress.errorMessage = getErrorMessage(error);
         await this._reportProgress('error', {
           message: `Error fetching threads: ${getErrorMessage(error)}`,
         });
@@ -117,12 +141,12 @@ export class DomainCollector {
     // Build results
     const result = this._buildResults(domainCounts);
 
-    const limitMsg = this.config.limit ? ` (limited to ${this.config.limit})` : '';
+    this.progress.status = 'completed';
+
     await this._reportProgress('collection_completed', {
-      processed_threads: totalThreads,
-      total_threads: effectiveTotal,
+      collected,
       unique_domains: Object.keys(result.domainResults).length,
-      message: `Collection complete${limitMsg}: ${totalThreads.toLocaleString()} threads processed, ${Object.keys(result.domainResults).length.toLocaleString()} unique domains`,
+      message: `Collection complete: ${collected.toLocaleString()} threads collected, ${Object.keys(result.domainResults).length.toLocaleString()} unique domains`,
     });
 
     return result;

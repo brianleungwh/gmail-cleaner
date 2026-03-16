@@ -10,6 +10,7 @@
   import { DomainCollector } from '../gmail/collector.js';
   import { DomainCleaner } from '../gmail/cleaner.js';
   import { createProgressHandler } from '../gmail/progressHandler.js';
+  import { startProgressPolling, stopProgressPolling } from '../gmail/progressPoller.js';
   import { getErrorMessage } from '../errors.js';
 
   let collectBtnText = 'Scan Inbox';
@@ -33,6 +34,7 @@
 
     const progressHandler = createProgressHandler();
     const collector = new DomainCollector(config, progressHandler);
+    startProgressPolling(collector, 'collection');
 
     try {
       const result = await collector.collect();
@@ -49,6 +51,7 @@
       addLog(`Collection failed: ${getErrorMessage(error)}`, 'error');
       hideProgress();
     } finally {
+      stopProgressPolling();
       $isCollecting = false;
       collectBtnText = 'Scan Inbox';
     }
@@ -71,6 +74,7 @@
     const config = new CleanerConfig({ dryRun });
     const progressHandler = createProgressHandler();
     const cleaner = new DomainCleaner(config, progressHandler);
+    startProgressPolling(cleaner, 'cleanup');
 
     try {
       await cleaner.cleanup(threads);
@@ -78,6 +82,7 @@
       addLog(`Cleanup failed: ${getErrorMessage(error)}`, 'error');
       hideProgress();
     } finally {
+      stopProgressPolling();
       $isCleaning = false;
     }
   }

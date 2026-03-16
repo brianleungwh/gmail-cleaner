@@ -4,13 +4,22 @@
 
 import { trashThread } from './api.js';
 import { CleanupStats } from '../models/index.js';
-import { SUBJECT_TRUNCATE_CLEANER } from '../constants.js';
+
 
 export class DomainCleaner {
   constructor(config, progressCallback = null) {
     this.config = config;
     this.progressCallback = progressCallback;
     this.interrupted = false;
+
+    // Pollable progress state — UI reads this via setInterval
+    this.progress = {
+      processed: 0,
+      processTotal: 0,
+      deleted: 0,
+      dryRun: false,
+      status: 'idle',
+    };
   }
 
   // === Main Entry Point ===
@@ -20,10 +29,16 @@ export class DomainCleaner {
       return DomainCleaner.buildStats(0, 0, 0, 0);
     }
 
+    // Initialize pollable progress
+    this.progress.processTotal = threads.length;
+    this.progress.dryRun = this.config.dryRun;
+    this.progress.status = 'running';
+    this.progress.processed = 0;
+    this.progress.deleted = 0;
+
     await this._reportProgress('cleanup_started', {
       dry_run: this.config.dryRun,
-      limit: this.config.limit,
-      threads_to_process: threads.length,
+      process_total: threads.length,
     });
 
     let totalProcessed = 0;
@@ -34,27 +49,10 @@ export class DomainCleaner {
     for (const thread of threads) {
       if (this.interrupted) break;
 
-      const { thread_id, domain, subject, sender, message_count } = thread;
-
-      const truncatedSubject = subject.length > SUBJECT_TRUNCATE_CLEANER
-        ? subject.slice(0, SUBJECT_TRUNCATE_CLEANER) + '...'
-        : subject;
-
-      // Log what we're analyzing
-      await this._reportProgress('thread_analyzed', {
-        thread_id,
-        subject: truncatedSubject,
-        sender,
-      });
+      const { thread_id, message_count } = thread;
 
       if (this.config.dryRun) {
-        // Dry run - just report what would happen
-        await this._reportProgress('would_delete', {
-          thread_id,
-          subject: truncatedSubject,
-          sender,
-          message_count,
-        });
+        // Dry run - just count what would happen
         threadsDeleted += 1;
         messagesDeleted += message_count;
       } else {
@@ -62,25 +60,21 @@ export class DomainCleaner {
         const success = await this._trashThread(thread_id);
 
         if (success) {
-          await this._reportProgress('deleted', {
-            thread_id,
-            subject: truncatedSubject,
-            sender,
-            message_count,
-          });
           threadsDeleted += 1;
           messagesDeleted += message_count;
         } else {
-          await this._reportProgress('delete_error', {
-            thread_id,
-            error: 'Failed to trash thread',
-          });
           messagesKept += message_count;
         }
       }
 
       totalProcessed += 1;
+
+      // Update pollable progress in-place
+      this.progress.processed = totalProcessed;
+      this.progress.deleted = threadsDeleted;
     }
+
+    this.progress.status = 'completed';
 
     const result = DomainCleaner.buildStats(totalProcessed, threadsDeleted, messagesDeleted, messagesKept);
     await this._reportProgress('cleanup_completed', result);

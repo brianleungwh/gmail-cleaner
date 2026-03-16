@@ -152,6 +152,11 @@ export class DomainCollector {
   // === Thread Fetching ===
 
   async _getTotalThreadCount() {
+    if (this.config.includeArchived) {
+      // No single label covers "all mail"; return 0 so the UI shows
+      // progress without a percentage (the poller already handles this).
+      return 0;
+    }
     try {
       const inboxInfo = await getInboxInfo();
       return inboxInfo.threadsTotal || 0;
@@ -161,11 +166,15 @@ export class DomainCollector {
     }
   }
 
+  _buildQuery() {
+    return this.config.includeArchived ? '-in:trash -in:spam' : 'in:inbox';
+  }
+
   async _fetchThreadPage(pageToken) {
     const raw = await listThreads({
       maxResults: THREAD_PAGE_SIZE,
       pageToken,
-      q: 'in:inbox',
+      q: this._buildQuery(),
     });
 
     return new ThreadsList(raw);

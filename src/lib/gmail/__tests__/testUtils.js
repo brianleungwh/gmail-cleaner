@@ -78,6 +78,9 @@ export function sampleInbox() {
     // Plain email format (no angle brackets)
     makeThread('thread_008', 'plain@edge.com', 'Plain sender format', ['INBOX']),
 
+    // Archived thread (no INBOX label)
+    makeThread('thread_011', 'Old <old@archived.com>', 'Old newsletter', []),
+
     // Edge cases
     makeThreadNoMessages('thread_009'),
     makeThreadNoFromHeader('thread_010', 'No sender thread'),
@@ -117,8 +120,13 @@ export function createApiMocks(inboxData, { failThreads = new Set() } = {}) {
       labels: [],
     }),
 
-    listThreads: async ({ maxResults = 100, pageToken = null } = {}) => {
-      const threads = inboxData.threads || [];
+    listThreads: async ({ maxResults = 100, pageToken = null, q = 'in:inbox' } = {}) => {
+      const allThreads = inboxData.threads || [];
+      // Filter by query: 'in:inbox' returns only threads with INBOX label,
+      // anything else (e.g. '-in:trash -in:spam') returns all threads.
+      const threads = q === 'in:inbox'
+        ? allThreads.filter(t => (t.labelIds || []).includes('INBOX'))
+        : allThreads;
       const startIdx = pageToken ? parseInt(pageToken) : 0;
       const endIdx = Math.min(startIdx + maxResults, threads.length);
       const pageThreads = threads.slice(startIdx, endIdx).map(t => ({ id: t.id }));

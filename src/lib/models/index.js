@@ -16,11 +16,13 @@ export class CollectorConfig {
     excludedDomains = new Set(),
     useLabelProtection = true,
     protectedLabelIds = null,
+    includeArchived = false,
   } = {}) {
     this.limit = limit;
     this.excludedDomains = excludedDomains;
     this.useLabelProtection = useLabelProtection;
     this.protectedLabelIds = protectedLabelIds;
+    this.includeArchived = includeArchived;
   }
 }
 

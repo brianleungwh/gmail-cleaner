@@ -327,6 +327,42 @@ describe('collect', () => {
     expect(collector.progress.scanned).toBeGreaterThanOrEqual(collector.progress.collected);
   });
 
+  it('default scan does not include archived threads', async () => {
+    const collector = new DomainCollector(defaultConfig());
+    const result = await collector.collect();
+    const dr = result.domainResults;
+
+    // archived.com thread has no INBOX label — should not appear
+    expect(dr['archived.com']).toBeUndefined();
+  });
+
+  it('includeArchived collects archived threads', async () => {
+    const collector = new DomainCollector(defaultConfig({ includeArchived: true }));
+    const result = await collector.collect();
+    const dr = result.domainResults;
+
+    // archived.com thread should now be included
+    expect(dr['archived.com']).toBeDefined();
+    expect(dr['archived.com'].count).toBe(1);
+  });
+
+  it('includeArchived still collects inbox threads', async () => {
+    const collector = new DomainCollector(defaultConfig({ includeArchived: true }));
+    const result = await collector.collect();
+    const dr = result.domainResults;
+
+    // Regular inbox threads should still be present
+    expect(dr['spam.com']).toBeDefined();
+    expect(dr['social.com']).toBeDefined();
+  });
+
+  it('includeArchived sets scanTotal to 0', async () => {
+    const collector = new DomainCollector(defaultConfig({ includeArchived: true }));
+    await collector.collect();
+
+    expect(collector.progress.scanTotal).toBe(0);
+  });
+
   it('with label protection disabled, custom-labeled threads are collected', async () => {
     const collector = new DomainCollector(defaultConfig({ useLabelProtection: false }));
     const result = await collector.collect();

@@ -15,6 +15,7 @@
 
   let collectBtnText = 'Scan Inbox';
   let scanLimitInput = '';
+  let includeArchived = false;
 
   async function collectDomains() {
     if ($isCollecting) return;
@@ -30,6 +31,7 @@
       excludedDomains: new Set($excludedDomains),
       useLabelProtection: $useLabelProtection,
       protectedLabelIds: $protectedLabelIds ? new Set($protectedLabelIds) : null,
+      includeArchived,
     });
 
     const progressHandler = createProgressHandler();
@@ -123,6 +125,15 @@
           class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent text-sm"
         />
       </div>
+
+      <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+        <input
+          type="checkbox"
+          bind:checked={includeArchived}
+          class="rounded border-gray-300 text-slate-800 focus:ring-slate-400"
+        />
+        Include archived
+      </label>
     </div>
 
     <!-- Cleanup Controls -->
